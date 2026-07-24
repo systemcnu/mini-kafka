@@ -1,6 +1,6 @@
 # SPEC-BRIEF — mini-kafka · the only file you need to read at this gate
 
-**For: SPEC.md DRAFT v0.2 (2026-07-24), awaiting your verdict.** Every answer is stated in full here; pointers are only for auditing.
+**For: SPEC.md LOCKED v1.0 (2026-07-24).** This gate passed — this is the readable record. Every answer is stated in full here; pointers are only for auditing.
 
 ## Who's involved
 
@@ -80,14 +80,14 @@ sequenceDiagram
 
 Five independent fresh-eyes reviewers — four Claude seats plus Codex (different AI family): **46 findings, all integrated or escalated to you.** The worst, plainly: the spec's original durability test was worthless (a killed process's data survives in the operating system's memory anyway, so the test passed even with safety off); four seats independently found the half-dead-consumer hole; the hosted showcase as first written would have filled its own disk and died; the repo had no license, which legally means "all rights reserved" — the opposite of a portfolio; and a subtle off-by-one in how "resume position" was defined could have shipped two incompatible interpretations that tests would never catch.
 
-## Your four decisions at this gate (everything else locks by silence)
+## Your four decisions at this gate (resolved at lock, 2026-07-24)
 
-1. **Public name** — keep "mini-kafka" or pick an original name ("Kafka" is Apache's trademark; my recommendation: original name, described as "a Kafka-style broker").
-2. **License** — MIT (recommended), Apache-2.0, or decide at publication.
-3. **Benchmark modes** — durable-only (recommended) or also a labeled "unsafe fast" comparison line.
-4. **Showcase** — keep it conditional against the free tier's realities (sleeps, ~1-min wake, data resets — recommended) or drop to local-only now.
+1. **Public name — "mini-kafka" stays** (your call, trademark note acknowledged).
+2. **License — MIT.**
+3. **Benchmark modes — durable-only.**
+4. **Showcase — kept conditional** against the free tier's realities (sleeps, ~1-min wake, data resets).
 Also standing: if a new GitHub account is needed it registers under sr7544068@gmail.com; an existing account is your call.
 
-## What you do now
+## Status
 
-Read this brief (~5 min). Then reply **lock** (with your four answers), **revise: <what>**, or **abandon**. On "lock" I'll ask you 2–3 quiz questions from this brief first — same drill as last time.
+LOCKED 2026-07-24 after the 3-question quiz (two re-asks, both then answered on this brief's exact lines) and your four decisions above. Next stage: DESIGN — starts when you invoke it.

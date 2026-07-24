@@ -1,7 +1,8 @@
-# SPEC — mini-kafka (working name; see ledger D12 / open decision A1)
+# SPEC — mini-kafka
 
-**Status: DRAFT v0.2 (2026-07-24). Not locked. Nothing downstream may build on this.**
-v0.1 → v0.2: 46 lie-hunt findings integrated (5 seats — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8, Codex feasibility 9). New IDs: LOG-5, CONS-3, GRP-5, PROT-3, SHOW-4, NFR-4. Four decisions left open for the gate (§7).
+**Status: LOCKED v1.0 (2026-07-24). IDs frozen. Changes only via errata cascade.**
+Locked by Sri at the gate 2026-07-24 after the 3-question quiz (two re-asks, both then answered on the brief's exact lines) and four gate decisions, resolved in §7.
+v0.1 → v0.2: 46 lie-hunt findings integrated (5 seats — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8, Codex feasibility 9); new IDs LOG-5, CONS-3, GRP-5, PROT-3, SHOW-4, NFR-4. v0.2 → v1.0: gate decisions A1–A4 resolved; no requirement text changed.
 
 ## 0. Verbatim intent
 
@@ -38,7 +39,7 @@ Every requirement carries the check that would prove it. "Broker" = the single s
 ### Produce
 
 - **PROD-1 (produce).** A producer sends an opaque-bytes message to a chosen (topic, partition) — chosen explicitly or round-robin by the client; the broker never routes by key (U6). The ack returns the assigned offset. *Check: roundtrip test asserts returned offset matches consumed offset.*
-- **PROD-2 (ack = durable).** An ack is sent only after the record is durable (§1b). Batching/group-commit of fsync is design's call; the guarantee is not. There is exactly one ack semantic — no non-durable fast mode ships (D17; open decision A3). *Check: the LOG-1 pair proves it.*
+- **PROD-2 (ack = durable).** An ack is sent only after the record is durable (§1b). Batching/group-commit of fsync is design's call; the guarantee is not. There is exactly one ack semantic — no non-durable fast mode ships (D17, confirmed at lock). *Check: the LOG-1 pair proves it.*
 - **PROD-3 (size cap).** The cap applies to payload bytes (frame overhead is on top; both documented). Oversized messages are rejected with the error naming the cap; nothing is written. *Check: oversized produce → PROT-3 error naming limit; partition byte-count unchanged.*
 
 ### Consume & groups
@@ -71,7 +72,7 @@ Every requirement carries the check that would prove it. "Broker" = the single s
 
 ### Showcase (conditional — every SHOW row is void if no genuinely free no-card tier exists at build time; that outcome is documented as the alternative)
 
-Platform reality on record (Codex, 2026-07): the one credible no-card option is Render's free web-service tier — instances sleep after ~15 idle minutes, cold-start in ~1 minute, disk is ephemeral, restarts may happen anytime. The rows below are written against that reality. Open decision A4.
+Platform reality on record (Codex, 2026-07): the one credible no-card option is Render's free web-service tier — instances sleep after ~15 idle minutes, cold-start in ~1 minute, disk is ephemeral, restarts may happen anytime. The rows below are written against that reality. Kept conditional at lock (A4).
 
 - **SHOW-1 (watch-only).** A public page visualizes live message flow of a self-driving instance (it feeds itself demo traffic while awake). A sleeping instance cold-starts on visit behind a loading state. Visitors have no write path of any kind. *Check: the deployed surface serves only the read-only page/stream.*
 - **SHOW-2 ($0 enforced).** Free tier with NO payment method attached — no card, no cap-based fallback (U8). If the free tier ends or is exceeded: teardown, per a documented criterion. *Check: the platform requires no card (evidence recorded at design); teardown rule documented.*
@@ -82,7 +83,7 @@ Platform reality on record (Codex, 2026-07): the one credible no-card option is 
 
 - **OPS-1 (builds + platforms).** Each binary builds with an exact documented command (`go build ./cmd/<name>`), `CGO_ENABLED=0`, static. CI natively builds AND smoke-runs on pinned Linux and macOS runners — cross-compilation alone is not platform proof. *Check: CI matrix with a native smoke run on both.*
 - **OPS-2 (CI).** Public GitHub repo (hosted runners are free for public repos — this is why OPS-2 is $0); tests, `go vet` + linter, and both-platform build+smoke green on every push to main. Go version, runner images, actions, and linter version pinned. *Check: green status at HEAD; pins present in the workflow file.*
-- **OPS-3 (repo is the deliverable).** README's top screen contains the one demo command; the repo carries an OSI license (which one = open decision A2). *Check: README audit; LICENSE file exists.*
+- **OPS-3 (repo is the deliverable).** README's top screen contains the one demo command; the repo carries an OSI license (MIT, resolved at lock — A2). *Check: README audit; LICENSE file exists.*
 
 ### Non-functional
 
@@ -147,14 +148,14 @@ Platform reality on record (Codex, 2026-07): the one credible no-card option is 
 | D9 | Single broker process, single node (restates U5/U6). | Tier choice. | None; replication is out. |
 | D10 | Benchmarks: committed reference report from Sri's stated hardware + harness for visitors to reproduce locally. | Honest and free. | Server-grade numbers would need rented hardware — new scope. |
 | D11 | GitHub hosts; repo public early (it IS the deliverable). New account → sr7544068@gmail.com per standing rule; existing-account choice is Sri's at the gate. | Portfolio needs a public home. | Publishing later just shifts OPS-2/3 timing. |
-| D12 | Working name "mini-kafka"; public name is open decision A1 ("Kafka" is an Apache trademark). | Naming a public artifact is the user's call. | Rename is cheap pre-publication, annoying after. |
+| D12 | Name "mini-kafka" — RESOLVED at lock (A1): Sri keeps it, trademark note acknowledged; now user-stated. | Naming a public artifact is the user's call. | Rename is cheap pre-publication, annoying after. |
 | D13 | Committed offset = NEXT offset to read (Kafka convention), stated in §1b and the protocol doc. | Kills a silent off-by-one that tests can't catch. | None — any consistent convention works, but it must be one. |
 | D14 | A group with no committed offset starts at the earliest offset. | Fan-out demo (Scenario F) works by contract, not luck. | Kafka defaults to latest; earliest is friendlier for a demo. |
 | D15 | One group subscribes to exactly one topic. | Halves protocol and rebalance surface at zero demo cost. | Multi-topic groups are a Kafka feature readers might probe. |
 | D16 | Fetch is long-poll with client max-wait. | No busy-polling in the demo; honest e2e latency measurable. | Slightly bigger protocol surface than immediate-return. |
-| D17 | Exactly one ack semantic ships: durable. No labeled unsafe fast mode. Open decision A3. | Honesty over impressiveness (R5); one semantic = one proof. | Benchmarks can't show a "fast mode" comparison line. |
+| D17 | Exactly one ack semantic ships: durable. No labeled unsafe fast mode. CONFIRMED at lock (A3). | Honesty over impressiveness (R5); one semantic = one proof. | Benchmarks can't show a "fast mode" comparison line. |
 | D18 | Topic deletion OUT (offline remedy documented). | Retention already out; delete adds API+recovery surface. | In-band cleanup impossible; disk remedy is manual. |
-| D19 | Repo must carry an OSI license; which one = open decision A2. | Unlicensed public code is all-rights-reserved — defeats G1. | — |
+| D19 | License: MIT — RESOLVED at lock (A2). | Unlicensed public code is all-rights-reserved — defeats G1. | — |
 
 ## 6. Accepted risks
 
@@ -165,9 +166,11 @@ Platform reality on record (Codex, 2026-07): the one credible no-card option is 
 - **R5 — Benchmark numbers are modest.** A single-node fsync-honest Go broker won't post Kafka-headline numbers; honesty (BENCH-2) is chosen over impressiveness — and only the durable mode exists to benchmark (D17).
 - **R6 — The showcase sleeps.** On the free tier the instance sleeps when idle; a visitor's first load waits ~1 minute behind a loading state. Accepted consequence of U8.
 
-## 7. Open at this gate (Sri decides; everything else locks by silence)
+## 7. Gate decisions (resolved at lock 2026-07-24 — Sri's own choices, user-stated)
 
-- **A1 — Public name.** Keep "mini-kafka" vs an original name + "a Kafka-style log/broker" description ("Kafka" is an Apache trademark; portfolio repos commonly do it anyway). *Recommendation: original name.*
-- **A2 — License.** MIT (recommended — maximally readable portfolio signal) vs Apache-2.0 (patent grant, longer) vs decide-at-publication.
-- **A3 — Benchmark modes.** Ship only the durable ack path (D17, recommended) vs also a clearly-labeled unsafe no-fsync comparison line. Recommended: durable only — one semantic, one proof, unimpeachable numbers; the comparison line can be added later without unlocking anything.
-- **A4 — Showcase under platform reality.** Keep the conditional showcase as specced against Render's free tier (sleeps, ~1 min cold start, ephemeral disk — recommended; final feasibility re-checked at design) vs drop to local-only now and record R4 as realized. Recommended: keep conditional.
+- **A1 — Public name: "mini-kafka" stays.** Sri chose to keep it over the recommended original name; the trademark note (D12) was presented and acknowledged.
+- **A2 — License: MIT.** (D19 resolved.)
+- **A3 — Benchmark modes: durable only.** (D17 confirmed — one ack semantic, one proof.)
+- **A4 — Showcase: kept conditional** against the recorded platform reality (sleeps when idle, ~1-minute wake, ephemeral disk); final feasibility is re-checked at DESIGN, and R4 stands.
+
+All other ledger rows (D1–D19) were accepted by silence at this lock.

@@ -1,13 +1,13 @@
-# STATUS — mini-kafka (working name; public name is open decision A1)
+# STATUS — mini-kafka (public name, resolved at SPEC lock)
 
 **Updated: 2026-07-24.** Project authority for this repo. Lab/process view: `~/skills/process/LAB-STATE.md`.
 
 ## Where things stand
 
-- **SPEC: DRAFT v0.2 (2026-07-24) — AT THE GATE, awaiting Sri's verdict.** 37 active IDs, scenarios A–K, ledger U1–U8 (user-stated, from the 8-question grill) + D1–D19. Read `SPEC-BRIEF.md` (~5 min, 2 baked diagrams).
-- Lie-hunt: 5 seats (4 Claude — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8 — plus Codex feasibility 9) = 46 findings, all integrated or escalated. Orphan-ID audit clean (ranges expanded; scenario K added).
-- **Open at the gate (§7): A1 public name · A2 license · A3 benchmark modes · A4 showcase-vs-platform-reality.** Everything else locks by silence.
-- Nothing downstream exists. DESIGN is refused until SPEC locks and its hash is stamped here.
+- **SPEC: LOCKED v1.0 (2026-07-24).** 37 active IDs, scenarios A–K, ledger U1–U8 + D1–D19 (all accepted at lock). Hash: `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9`. Read `SPEC-BRIEF.md`.
+- Locked by Sri after the 3-question quiz (two re-asks, both then answered on the brief's exact lines) and four gate decisions, recorded in SPEC §7: name stays "mini-kafka" · MIT license · durable-only benchmarks · showcase kept conditional.
+- Lie-hunt record: 5 seats (4 Claude — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8 — plus Codex feasibility 9) = 46 findings, all integrated or gate-resolved. Orphan-ID audit clean.
+- **Next stage: DESIGN — allowed now, starts when invoked.** Its preflight must verify the SPEC hash above.
 
 ## Grill record
 
