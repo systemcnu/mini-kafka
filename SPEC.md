@@ -93,16 +93,17 @@ Platform reality on record (Codex, 2026-07): the one credible no-card option is 
 
 ## 3. Scenarios (acceptance; every one owned by exactly one slice later)
 
-- **A — First contact (the visitor's scenario).** Visitor clones, runs `go run ./cmd/demo` from the README top screen; first messages flow within 60 seconds of the command starting (DEMO-1); the demo then kills a consumer and narrates the takeover; everything done inside 3 minutes (DEMO-2, GRP-2).
-- **B — Restart durability.** Produce N acked, stop broker normally, restart: all N consumable, same offsets. (LOG-1, LOG-2)
+- **A — First contact (the visitor's scenario).** Visitor clones, runs `go run ./cmd/demo` from the README top screen; first messages flow within 60 seconds of the command starting (DEMO-1); the demo then kills a consumer and narrates the takeover; everything done inside 3 minutes (DEMO-2, GRP-2). The demo's producers/consumers are the shipped client over long-poll fetch (PROT-2, CONS-1).
+- **B — Restart durability.** Create a topic with a fixed partition count (TOP-1), produce N acked (PROD-1), stop broker normally, restart: all N consumable, in offset order, same offsets, partition count unchanged. (LOG-1, LOG-2, LOG-3, TOP-2)
 - **C — Crash durability.** Produce with acks and commits, `kill -9` mid-load, restart: every acked message intact, group positions intact, torn tail truncated, no partial record ever served. (LOG-1, LOG-4, PROD-2, CONS-3)
 - **D — Consumer resumes.** A committing consumer restarts and continues exactly from the committed offset (dupes only for uncommitted work). (CONS-2, GRP-3)
 - **E — Rebalance under failure.** Two members split four partitions; one is killed; within liveness-deadline + rebalance-bound the survivor owns all four; the full stream is still delivered at-least-once; the dead member's later commits are fenced. (GRP-1, GRP-2, GRP-3, GRP-5)
 - **F — Fan-out.** A second group with no committed offsets joins later and independently receives the full stream from offset 0. (GRP-4)
-- **G — Benchmark run.** One command, ≥3 iterations, labeled machine-written report; README numbers match a committed report. (BENCH-1..3)
+- **G — Benchmark run.** One command, ≥3 iterations, labeled machine-written report via the shipped client; README numbers match a committed report. (BENCH-1, BENCH-2, BENCH-3, PROT-2)
 - **H — Hostile inputs.** Oversized message, unknown topic, bad partition index, malformed frame, stale generation: each gets its stable error code; broker stays up; nothing is written. (PROT-3, PROD-3, NFR-2)
-- **I — Showcase visit (conditional).** Visitor opens the page (cold start allowed), watches live traffic; external scan shows only the web surface. (SHOW-1..4)
+- **I — Showcase visit (conditional).** Visitor opens the page (cold start allowed), watches live traffic; external scan shows only the web surface; disk stays bounded; no card on the account. (SHOW-1, SHOW-2, SHOW-3, SHOW-4)
 - **J — Disk full.** The log's disk fills: produces fail with the write-failure code, reads keep working, and recovery after freeing space needs no manual repair. (LOG-5, PROT-3)
+- **K — Repo & CI.** A push to main natively builds and smoke-runs both platforms, passes vet/lint, the stdlib-only audit, and the protocol-doc completeness audit; the README top screen carries the demo command and a LICENSE file exists. (OPS-1, OPS-2, OPS-3, NFR-1, NFR-3, PROT-1)
 
 ## 4. Out of scope (user-stated U6 unless noted)
 
