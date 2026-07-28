@@ -135,6 +135,7 @@ CARDS = [
                 ("internal/storage/partition.go", "QueuedWaiters", "method"),
                 ("internal/storage/partition.go", "ParkedWaiters", "method"),
                 ("internal/storage/partition.go", "ErrWriteRejected", "var"),
+                ("internal/storage/partition.go", "degrade", "method"),
             ]),
         ],
     },
@@ -189,7 +190,7 @@ CARDS = [
     {
         "id": "proofs", "nick": "the proving ground", "icon": "\U0001f9ea", "tint": "proofs",
         "file": "*_test.go · scripts/checks.sh", "col": 3, "row": 2,
-        "purpose": "The SL0 proof battery: ack-ordering recorder, boot-scan branches, frontier-advance wakes, graceful drain, live caps over the wire.",
+        "purpose": "The proof battery: ack-ordering recorder, the full recovery fault matrix, degrade suite, kill -9 crash cycles, live caps over the wire.",
         "groups": [
             ("key suites", [
                 ("internal/storage/partition_test.go", "internal/storage/partition_test.go", "file"),
@@ -199,6 +200,17 @@ CARDS = [
                 ("internal/broker/caps_test.go", "internal/broker/caps_test.go", "file"),
                 ("internal/broker/broker_test.go", "internal/broker/broker_test.go", "file"),
                 ("scripts/checks.sh", "scripts/checks.sh", "file"),
+            ]),
+            ("SL1: crash & disk (scripted faults)", [
+                ("internal/storage/degrade_test.go", "internal/storage/degrade_test.go", "file"),
+                ("internal/storage/store_fault_test.go", "internal/storage/store_fault_test.go", "file"),
+                ("internal/broker/writefailed_test.go", "internal/broker/writefailed_test.go", "file"),
+                ("internal/e2e/crash_test.go", "internal/e2e/crash_test.go", "file"),
+            ]),
+            ("fault scripting seam", [
+                ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
+                ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
+                ("internal/storage/storagetest/fault.go", "FaultSyncer", "type"),
             ]),
         ],
     },
