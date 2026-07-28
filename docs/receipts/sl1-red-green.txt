@@ -29,3 +29,66 @@ $ go test ./internal/storage/storagetest/ -count=1 -v
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.264s
 
+=== internal/storage/recovery_test.go (matrix: truncation rows) — RED (sabotage: recovery's tail truncation disabled) — Tue Jul 28 15:29:07 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run 'TestRecovery(TruncatesShortWriteTail|TruncatesCRCCorruptTail|DoubleBoot)'
+--- FAIL: TestRecoveryTruncatesShortWriteTailPastFrontier (0.07s)
+    recovery_test.go:249: log size after recovery = 39, <nil>; want truncated to frontier 26
+--- FAIL: TestRecoveryTruncatesCRCCorruptTailPastFrontier (0.06s)
+    recovery_test.go:277: log size after recovery = 49, <nil>; want truncated to frontier 26
+--- FAIL: TestRecoveryDoubleBootIsIdempotent (0.07s)
+    recovery_test.go:401: log size after first boot = 30, want frontier 19
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.415s
+FAIL
+
+=== internal/storage/recovery_test.go (matrix: acked-damage refusal) — RED (sabotage: refusal flipped to silent truncate) — Tue Jul 28 15:29:22 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestRecoveryRefusesCorruptedAckedByte
+--- FAIL: TestRecoveryRefusesCorruptedAckedByte (0.08s)
+    recovery_test.go:303: refusal "partition /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestRecoveryRefusesCorruptedAckedByte4185593160/001: refusing to load: parse consumed 12 bytes of acked range, frontier says 24" does not name "at byte 12"
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.280s
+FAIL
+
+=== internal/storage/recovery_test.go (matrix: straddle refusal) — RED (sabotage: straddle check disabled) — Tue Jul 28 15:29:34 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestRecoveryRefusesRecordStraddlingFrontier
+--- FAIL: TestRecoveryRefusesRecordStraddlingFrontier (0.04s)
+    recovery_test.go:325: refusal "partition /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestRecoveryRefusesRecordStraddlingFrontier2924879985/001: refusing to load: parse consumed 0 bytes of acked range, frontier says 5" does not name "straddles frontier"
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.263s
+FAIL
+
+=== internal/storage/recovery_test.go (matrix: frontier CRC refusal) — RED (sabotage: parseFrontier CRC check bypassed) — Tue Jul 28 15:29:46 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestRecoveryRefusesFrontierCRCBad
+--- FAIL: TestRecoveryRefusesFrontierCRCBad (0.04s)
+    recovery_test.go:344: refusal "partition /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestRecoveryRefusesFrontierCRCBad1741918006/001: refusing to load: parse consumed 0 bytes of acked range, frontier says -72057594037927924" does not name "frontier file unreadable or CRC-bad"
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.265s
+FAIL
+
+=== internal/storage/recovery_test.go (matrix: frontier-beyond-length refusal) — RED (sabotage: beyond-length check disabled) — Tue Jul 28 15:30:01 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestRecoveryRefusesFrontierBeyondLogLength
+--- FAIL: TestRecoveryRefusesFrontierBeyondLogLength (0.05s)
+    recovery_test.go:365: refusal "partition /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestRecoveryRefusesFrontierBeyondLogLength1701083433/001: refusing to load: parse consumed 12 bytes of acked range, frontier says 112" does not name "beyond log length"
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.265s
+FAIL
+
+=== internal/storage/recovery_test.go (SL1 matrix, all rows) — GREEN (all sabotages restored) — Tue Jul 28 15:30:13 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -v -run 'TestRecovery(TruncatesShortWriteTail|TruncatesCRCCorruptTail|RefusesCorruptedAckedByte|RefusesRecordStraddling|RefusesFrontierCRCBad|RefusesFrontierBeyondLogLength|DoubleBoot)'
+=== RUN   TestRecoveryTruncatesShortWriteTailPastFrontier
+--- PASS: TestRecoveryTruncatesShortWriteTailPastFrontier (0.10s)
+=== RUN   TestRecoveryTruncatesCRCCorruptTailPastFrontier
+--- PASS: TestRecoveryTruncatesCRCCorruptTailPastFrontier (0.11s)
+=== RUN   TestRecoveryRefusesCorruptedAckedByte
+--- PASS: TestRecoveryRefusesCorruptedAckedByte (0.07s)
+=== RUN   TestRecoveryRefusesRecordStraddlingFrontier
+--- PASS: TestRecoveryRefusesRecordStraddlingFrontier (0.04s)
+=== RUN   TestRecoveryRefusesFrontierCRCBad
+--- PASS: TestRecoveryRefusesFrontierCRCBad (0.04s)
+=== RUN   TestRecoveryRefusesFrontierBeyondLogLength
+--- PASS: TestRecoveryRefusesFrontierBeyondLogLength (0.04s)
+=== RUN   TestRecoveryDoubleBootIsIdempotent
+--- PASS: TestRecoveryDoubleBootIsIdempotent (0.07s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/storage	0.650s
+
