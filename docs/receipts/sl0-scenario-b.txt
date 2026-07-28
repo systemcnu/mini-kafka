@@ -1,0 +1,31 @@
+# Scenario B live demo — 2026-07-28T17:10:13Z
+# create topic, produce 4, consume (offsets visible), SIGTERM broker, restart, consume again — same offsets
+$ minikafka --addr 127.0.0.1:7621 --data /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/tmp.AymB2S2jWy (background)
+2026/07/28 12:10:14 minikafka listening on 127.0.0.1:7621 (data: /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/tmp.AymB2S2jWy)
+$ mk create-topic -t demo -p 2
+created topic demo with 2 partition(s)
+$ mk produce -t demo -p 0 (4 messages)
+0
+1
+2
+3
+$ mk consume -t demo -p 0
+0	alpha
+1	beta
+2	gamma
+3	delta
+$ kill -TERM broker (graceful stop)
+2026/07/28 12:10:15 minikafka: signal received, stopping gracefully
+2026/07/28 12:10:15 minikafka: stopped
+broker exited: 0
+$ restart broker, same data dir
+2026/07/28 12:10:15 minikafka listening on 127.0.0.1:7621 (data: /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/tmp.AymB2S2jWy)
+$ mk consume -t demo -p 0 (after restart)
+0	alpha
+1	beta
+2	gamma
+3	delta
+$ mk topics
+demo	2
+2026/07/28 12:10:16 minikafka: signal received, stopping gracefully
+2026/07/28 12:10:16 minikafka: stopped
