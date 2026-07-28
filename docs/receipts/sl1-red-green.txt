@@ -198,3 +198,13 @@ $ go test ./internal/e2e/ -count=1
 $ go test ./internal/e2e/ -count=1
 ok  	github.com/systemcnu/mini-kafka/internal/e2e	1.400s
 
+
+=== EXIT SABOTAGE (D-SL1-8, run by the verifier's own hands): recovery's acked-damage refusal flipped to silent truncate — Tue Jul 28 15:41:00 CDT 2026 ===
+--- FAIL: TestRecoveryRefusesCorruptedAckedByte (0.08s)
+    recovery_test.go:303: refusal "partition /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestRecoveryRefusesCorruptedAckedByte1253068203/001: refusing to load: parse consumed 12 bytes of acked range, frontier says 24" does not name "at byte 12"
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.328s
+FAIL
+=== EXIT SABOTAGE restored (git diff clean on recovery.go) — full storage battery GREEN — Tue Jul 28 15:41:15 CDT 2026 ===
+ok  	github.com/systemcnu/mini-kafka/internal/storage	3.201s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.435s
