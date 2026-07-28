@@ -1,6 +1,6 @@
 # DESIGN-BRIEF — mini-kafka · the only file you need to read at this gate
 
-**For: DESIGN.md DRAFT v0.2 (2026-07-24), awaiting your verdict.** Built against your locked SPEC v1.0. Every answer is stated in full here; pointers are only for auditing.
+**For: DESIGN.md LOCKED v1.0 (2026-07-28).** This gate passed — this is the readable record. Built against your locked SPEC v1.0. Every answer is stated in full here; pointers are only for auditing.
 
 ## The shape, in one picture
 
@@ -86,6 +86,6 @@ sequenceDiagram
 
 Four independent fresh-eyes reviewers, one cross-family (Codex): **37 findings, all integrated — one declined with a written reason.** The worst, plainly: all four seats independently found that the one-request-per-connection rule would starve heartbeats behind waiting fetches, getting every idle consumer declared dead every 2 seconds (the demo would have thrashed forever); the safety bookmark could itself be torn by a crash, and a corrupt record straddling its boundary would have been misclassified — silently deleting promised data; the demo's 60-second receipt was being measured from inside the program, blind to the compile time a real visitor pays; the protocol permitted a reply bigger than its own maximum legal message; and hostile topic names went straight into file paths.
 
-## Status & what you do now
+## Status
 
-**Zero decisions are open at this gate** — every finding resolved into the design; the ledger locks by silence. Read this brief (~5 min). Reply **lock**, **revise: <what>**, or **abandon**. On "lock": 2–3 quiz questions from this brief first, then SLICES is next.
+LOCKED 2026-07-28 after the 3-question quiz (read-visibility and heartbeat-split answered clean; the disk-error question took its one re-ask, then landed exactly right). Zero decisions were open; everything locked by silence. Next stage: SLICES — starts when you invoke it.

@@ -1,7 +1,8 @@
 # DESIGN — mini-kafka
 
-**Status: DRAFT v0.2 (2026-07-24). Not locked.**
+**Status: LOCKED v1.0 (2026-07-28). DD rows frozen. Changes only via errata cascade.**
 **Upstream: SPEC LOCKED v1.0, sha256 `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9` — verified at preflight.**
+Locked by Sri at the gate 2026-07-28 after the 3-question quiz (two clean, one re-ask answered correctly). Zero decisions were open; all DD rows accepted by silence.
 v0.1 → v0.2: 37 lie-hunt findings integrated (4 seats — coverage 8, buildability 9, simplicity 10, Codex platform-reality 10). Biggest changes: split control/fetch connections, read visibility capped at the durable frontier, atomic checksummed frontier, multi-partition fetch, immediate rebalance (join window deleted), externally-measured demo clock, name validation, showcase loading shim.
 
 ## 1. Shape
