@@ -149,3 +149,29 @@ $ go test ./internal/broker/ -count=1 -v -run TestProduceOnFaultedStore
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/broker	0.317s
 
+=== internal/storage/store_fault_test.go — RED (sabotage: CreateTopic's abort cleanup skipped) — Tue Jul 28 15:34:50 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestCreateTopicAbortsCleanly
+--- FAIL: TestCreateTopicAbortsCleanlyOnMidCreateFault (0.06s)
+    --- FAIL: TestCreateTopicAbortsCleanlyOnMidCreateFault/frontier_file_fsync_fails (0.01s)
+        store_fault_test.go:54: topic dir survives the abort (err=<nil>), want removed
+    --- FAIL: TestCreateTopicAbortsCleanlyOnMidCreateFault/partition_dir_fsync_fails (0.02s)
+        store_fault_test.go:54: topic dir survives the abort (err=<nil>), want removed
+    --- FAIL: TestCreateTopicAbortsCleanlyOnMidCreateFault/meta.json_atomicWrite_fails (0.03s)
+        store_fault_test.go:54: topic dir survives the abort (err=<nil>), want removed
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.286s
+FAIL
+
+=== internal/storage/store_fault_test.go — GREEN (sabotage restored) — Tue Jul 28 15:35:01 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -v -run TestCreateTopicAbortsCleanly
+=== RUN   TestCreateTopicAbortsCleanlyOnMidCreateFault
+=== RUN   TestCreateTopicAbortsCleanlyOnMidCreateFault/frontier_file_fsync_fails
+=== RUN   TestCreateTopicAbortsCleanlyOnMidCreateFault/partition_dir_fsync_fails
+=== RUN   TestCreateTopicAbortsCleanlyOnMidCreateFault/meta.json_atomicWrite_fails
+--- PASS: TestCreateTopicAbortsCleanlyOnMidCreateFault (0.28s)
+    --- PASS: TestCreateTopicAbortsCleanlyOnMidCreateFault/frontier_file_fsync_fails (0.08s)
+    --- PASS: TestCreateTopicAbortsCleanlyOnMidCreateFault/partition_dir_fsync_fails (0.09s)
+    --- PASS: TestCreateTopicAbortsCleanlyOnMidCreateFault/meta.json_atomicWrite_fails (0.11s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/storage	0.470s
+
