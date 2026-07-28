@@ -1,0 +1,63 @@
+# CI battery (D-SL0-9). Every command here also runs locally via
+# scripts/checks.sh; runner images are mutable, so jobs echo the resolved
+# image rather than claiming immutability (DD-26).
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: echo "runner image= $ImageOS $ImageVersion"
+      - run: go test ./... -count=1
+
+  vet-staticcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: go vet ./...
+      # staticcheck pinned to a release compatible with the pinned toolchain.
+      - run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+      - run: staticcheck ./...
+
+  stdlib-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: bash scripts/stdlib_audit.sh
+
+  build-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: echo "runner image= $ImageOS $ImageVersion"
+      - name: build broker and CLI
+        run: |
+          CGO_ENABLED=0 go build -o bin/minikafka ./cmd/minikafka
+          CGO_ENABLED=0 go build -o bin/mk ./cmd/mk
+      - name: 5s produce/consume smoke
+        run: |
+          set -euo pipefail
+          ./bin/minikafka --data "$RUNNER_TEMP/smoke-data" &
+          BROKER=$!
+          sleep 1
+          ./bin/mk create-topic -t smoke -p 1
+          ./bin/mk produce -t smoke -p 0 -m "smoke-message"
+          out=$(./bin/mk consume -t smoke -p 0 -o 0)
+          echo "$out"
+          echo "$out" | grep -q "smoke-message"
+          kill $BROKER

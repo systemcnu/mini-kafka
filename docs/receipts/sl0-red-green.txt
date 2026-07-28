@@ -1,0 +1,76 @@
+=== internal/wire/frame_test.go + names_test.go — RED (implementation missing) — Tue Jul 28 11:44:25 CDT 2026 ===
+$ go test ./internal/wire/ -count=1
+# mini-kafka/internal/wire [mini-kafka/internal/wire.test]
+internal/wire/frame_test.go:19:21: undefined: TypeListTopics
+internal/wire/frame_test.go:20:21: undefined: TypeProduce
+internal/wire/frame_test.go:21:18: undefined: TypeError
+internal/wire/frame_test.go:26:14: undefined: WriteFrame
+internal/wire/frame_test.go:29:25: undefined: ReadFrame
+internal/wire/frame_test.go:29:41: undefined: MaxRequestFrame
+internal/wire/frame_test.go:54:16: undefined: MaxRequestFrame
+internal/wire/frame_test.go:55:15: undefined: ReadFrame
+internal/wire/frame_test.go:55:28: undefined: MaxRequestFrame
+internal/wire/frame_test.go:56:12: undefined: Error
+internal/wire/frame_test.go:56:12: too many errors
+FAIL	mini-kafka/internal/wire [build failed]
+FAIL
+
+=== internal/wire/frame_test.go + names_test.go — GREEN — Tue Jul 28 11:45:02 CDT 2026 ===
+$ go test ./internal/wire/ -count=1 -v
+=== RUN   TestFrameRoundtrip
+=== RUN   TestFrameRoundtrip/empty_payload
+=== RUN   TestFrameRoundtrip/small_payload
+=== RUN   TestFrameRoundtrip/error_type
+--- PASS: TestFrameRoundtrip (0.00s)
+    --- PASS: TestFrameRoundtrip/empty_payload (0.00s)
+    --- PASS: TestFrameRoundtrip/small_payload (0.00s)
+    --- PASS: TestFrameRoundtrip/error_type (0.00s)
+=== RUN   TestReadFrameTooLarge
+--- PASS: TestReadFrameTooLarge (0.00s)
+=== RUN   TestReadFrameAtCapOK
+--- PASS: TestReadFrameAtCapOK (0.00s)
+=== RUN   TestReadFrameLenBelowMinimum
+--- PASS: TestReadFrameLenBelowMinimum (0.00s)
+=== RUN   TestReadFrameBadVersion
+--- PASS: TestReadFrameBadVersion (0.00s)
+=== RUN   TestReadFramePartialAtEOF
+--- PASS: TestReadFramePartialAtEOF (0.00s)
+=== RUN   TestValidateName
+--- PASS: TestValidateName (0.00s)
+PASS
+ok  	mini-kafka/internal/wire	0.298s
+
+=== internal/wire/messages_test.go — RED (implementation missing) — Tue Jul 28 11:45:47 CDT 2026 ===
+$ go test ./internal/wire/ -count=1
+# mini-kafka/internal/wire [mini-kafka/internal/wire.test]
+internal/wire/messages_test.go:11:8: undefined: Produce
+internal/wire/messages_test.go:12:14: undefined: DecodeProduce
+internal/wire/messages_test.go:22:8: undefined: Produce
+internal/wire/messages_test.go:23:14: undefined: DecodeProduce
+internal/wire/messages_test.go:33:8: undefined: ProduceResp
+internal/wire/messages_test.go:34:14: undefined: DecodeProduceResp
+internal/wire/messages_test.go:44:8: undefined: CreateTopic
+internal/wire/messages_test.go:45:14: undefined: DecodeCreateTopic
+internal/wire/messages_test.go:55:8: undefined: ListTopicsResp
+internal/wire/messages_test.go:55:33: undefined: TopicInfo
+internal/wire/messages_test.go:55:33: too many errors
+
+=== internal/wire/messages_test.go — GREEN — Tue Jul 28 11:46:17 CDT 2026 ===
+$ go test ./internal/wire/ -count=1
+ok  	mini-kafka/internal/wire	0.285s
+
+=== internal/storage/fs_test.go — RED (implementation missing) — Tue Jul 28 11:46:51 CDT 2026 ===
+$ go test ./internal/storage/ -count=1
+# mini-kafka/internal/storage [mini-kafka/internal/storage.test]
+internal/storage/fs_test.go:18:10: undefined: OSFS
+internal/storage/fs_test.go:32:10: undefined: OSFS
+internal/storage/fs_test.go:48:10: undefined: OSFS
+internal/storage/fs_test.go:69:10: undefined: OSFS
+internal/storage/fs_test.go:85:10: undefined: OSFS
+FAIL	mini-kafka/internal/storage [build failed]
+FAIL
+
+=== internal/storage/fs_test.go — GREEN — Tue Jul 28 11:47:15 CDT 2026 ===
+$ go test ./internal/storage/ -count=1
+ok  	mini-kafka/internal/storage	0.361s
+
