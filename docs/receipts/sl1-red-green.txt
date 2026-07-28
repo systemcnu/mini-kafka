@@ -175,3 +175,26 @@ $ go test ./internal/storage/ -count=1 -v -run TestCreateTopicAbortsCleanly
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/storage	0.470s
 
+=== internal/e2e/crash_test.go — RED (sabotage: recovery forgets the durable frontier, so restart serves no journaled acks — the child binary is rebuilt from the sabotaged tree inside the test) — Tue Jul 28 15:37:22 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1
+--- FAIL: TestKill9CrashCycles (1.46s)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p3-4"@10 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p3-6"@14 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p3-0"@1 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p1-0"@3 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p2-0"@0 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p0-0"@2 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p1-4"@8 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p2-2"@6 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p0-6"@13 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p2-4"@11 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p0-4"@9 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p2-6"@15 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p1-6"@12 fetched as "" (present=false)
+    crash_test.go:245: cycle 0 partition 0: journaled ack "p0-2"@4 fetched as "" (present=false)
+[output truncated: one journaled-ack line per lost record]
+
+=== internal/e2e/crash_test.go — GREEN (sabotage restored) — Tue Jul 28 15:37:33 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	1.400s
+
