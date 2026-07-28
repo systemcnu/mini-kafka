@@ -92,3 +92,45 @@ $ go test ./internal/storage/ -count=1 -v -run 'TestRecovery(TruncatesShortWrite
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/storage	0.650s
 
+=== internal/storage/degrade_test.go — RED (natural: DD-8 truncate-back does not exist yet — SL0 baseline only marks failed) — Tue Jul 28 15:31:49 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestDegrade
+--- FAIL: TestDegradeShortWriteTruncatesBackToFrontier (0.10s)
+    degrade_test.go:112: log size after degrade = 32, <nil>; want 29
+--- FAIL: TestDegradeSyncErrorTruncatesBack (0.10s)
+    degrade_test.go:142: log size after degrade = 43, <nil>; want 29
+--- FAIL: TestDegradeRepairSyncFailureIsSafe (0.10s)
+    degrade_test.go:192: log size after degrade = 32, <nil>; want 29
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	1.017s
+FAIL
+
+=== internal/storage/degrade_test.go — GREEN (degrade() implemented) — Tue Jul 28 15:32:16 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -v -run TestDegrade
+=== RUN   TestDegradeShortWriteTruncatesBackToFrontier
+--- PASS: TestDegradeShortWriteTruncatesBackToFrontier (0.14s)
+=== RUN   TestDegradeWriteErrorRejectsSticky
+--- PASS: TestDegradeWriteErrorRejectsSticky (0.15s)
+=== RUN   TestDegradeSyncErrorTruncatesBack
+--- PASS: TestDegradeSyncErrorTruncatesBack (0.14s)
+=== RUN   TestDegradeFrontierWriteFailureDoesNotTruncate
+--- PASS: TestDegradeFrontierWriteFailureDoesNotTruncate (0.13s)
+=== RUN   TestDegradeRepairTruncateFailureIsSafe
+--- PASS: TestDegradeRepairTruncateFailureIsSafe (0.13s)
+=== RUN   TestDegradeRepairSyncFailureIsSafe
+--- PASS: TestDegradeRepairSyncFailureIsSafe (0.12s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/storage	1.035s
+
+=== internal/storage/degrade_test.go (frontier case) — RED (sabotage: degrade(true) on the frontier-write branch — the brick D-SL1-3 forbids) — Tue Jul 28 15:32:29 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestDegradeFrontierWriteFailureDoesNotTruncate
+--- FAIL: TestDegradeFrontierWriteFailureDoesNotTruncate (0.11s)
+    degrade_test.go:160: log size after degrade = 29, <nil>; want 43
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.324s
+FAIL
+
+=== internal/storage/degrade_test.go — GREEN (sabotage restored; full storage battery) — Tue Jul 28 15:32:39 CDT 2026 ===
+$ go test ./internal/storage/... -count=1
+ok  	github.com/systemcnu/mini-kafka/internal/storage	3.091s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.440s
+

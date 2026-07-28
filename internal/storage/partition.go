@@ -339,18 +339,21 @@ func (p *Partition) flush(batch []waiter) {
 	}
 
 	if _, err := p.file.Write(body); err != nil {
-		p.markFailed()
+		p.degrade(true)
 		p.failAll(batch, ErrWriteRejected)
 		return
 	}
 
 	if err := p.syncer.Sync(p.file); err != nil {
-		p.markFailed()
+		p.degrade(true)
 		p.failAll(batch, ErrWriteRejected)
 		return
 	}
 	if err := p.fsys.WriteFileAtomic(filepath.Join(p.dir, "frontier"), encodeFrontier(pos)); err != nil {
-		p.markFailed()
+		// NO truncate-back here (D-SL1-3): the atomicWrite may have failed
+		// AFTER its rename installed the NEW frontier, and truncating to the
+		// old value could leave frontier > log length — a boot refusal.
+		p.degrade(false)
 		p.failAll(batch, ErrWriteRejected)
 		return
 	}
@@ -378,10 +381,38 @@ func (p *Partition) flush(batch []waiter) {
 	p.qmu.Unlock()
 }
 
-func (p *Partition) markFailed() {
+// degrade is DD-8's flush-failure path (D-SL1-3): mark the partition
+// write-rejecting FIRST (sticky until restart — stops new appends racing the
+// repair), then, only when truncateBack is set, best-effort truncate the log
+// back to the frontier and make the cut durable via a fresh handle
+// (recovery.go's pattern). truncateBack is legal ONLY on Write/Syncer.Sync
+// failures, where the on-disk frontier provably still equals the in-memory
+// one. A failed repair is accepted: reads are frontier-capped (DD-5) so the
+// torn range is never servable, and restart's scan re-truncates.
+func (p *Partition) degrade(truncateBack bool) {
 	p.mu.Lock()
 	p.failed = true
+	frontier := p.frontier
 	p.mu.Unlock()
+	if !truncateBack {
+		return
+	}
+	// Path-based Truncate while the O_APPEND handle stays open is safe ONLY
+	// because the flusher — the goroutine running this repair — is the sole
+	// writer. Do not close/reopen, and do not call this off the flusher.
+	logPath := filepath.Join(p.dir, "log")
+	if err := p.fsys.Truncate(logPath, frontier); err != nil {
+		return
+	}
+	f, err := p.fsys.OpenAppend(logPath)
+	if err != nil {
+		return
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return
+	}
+	f.Close()
 }
 
 func (p *Partition) failAll(batch []waiter, err error) {
