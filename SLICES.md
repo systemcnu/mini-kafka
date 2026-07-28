@@ -1,6 +1,7 @@
 # SLICES — mini-kafka
 
-**Status: DRAFT v0.2 (2026-07-28). Not locked.**
+**Status: LOCKED v1.0 (2026-07-28). Slice cut frozen. Changes only via errata cascade.**
+Locked by Sri at the gate 2026-07-28 after the 2-question quiz (both answered correctly, no re-asks) and two gate decisions, resolved in §5.
 **Upstream: SPEC LOCKED v1.0 `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9` · DESIGN LOCKED v1.0 `47bef8647c97c2b810f31ab8770d59cfc7b425030462a10402f3d7cceacfc72a` — both verified at preflight.**
 v0.1 → v0.2: 33 lie-hunt findings integrated (4 seats — coverage 7, verticality 6, sizing 10, Codex cut-order 10). Restructured: broker + safety edges + seams + LICENSE/README + CI baseline all moved into SL0; scenario C re-owned by SL2; demo moved ahead of hostile-input completeness; showcase feasibility check pulled early; sizing re-estimated honestly (15.5d → 24.5d, process overhead now budgeted).
 

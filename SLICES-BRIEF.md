@@ -1,6 +1,6 @@
 # SLICES-BRIEF — mini-kafka · the only file you need to read at this gate
 
-**For: SLICES.md DRAFT v0.2 (2026-07-28), awaiting your verdict.** Built against your locked SPEC v1.0 and DESIGN v1.0. Every answer is stated in full here; pointers are only for auditing.
+**For: SLICES.md LOCKED v1.0 (2026-07-28).** This gate passed — this is the readable record. Built against your locked SPEC v1.0 and DESIGN v1.0. Every answer is stated in full here; pointers are only for auditing.
 
 ## The roadmap
 
@@ -51,11 +51,11 @@ Eight slices, built in order, each ending in something you can watch run — nev
 
 Four independent fresh-eyes reviewers, one cross-family (Codex): **33 findings, all integrated.** The worst, plainly: the skeleton slice's build list contained no broker — the very first exit demo was unrunnable as written; a crash scenario was owned by a slice that couldn't demonstrate its commit half (commits didn't exist yet); the recommended "publish at slice 0" default pointed at a slice with no license in it; the sizing was uniformly optimistic by roughly a factor of 1.6; and the fencing demo claimed an observation a killed process cannot physically produce.
 
-## Your two decisions at this gate (everything else locks by silence)
+## Your two decisions at this gate (resolved at lock, 2026-07-28)
 
-- **B1 — Publish when?** At slice 0's exit, iterating in public (recommended — matches your locked design's "public early", and an honest commit history is itself portfolio material) — or after SL3, once the 60-second demo works.
-- **B2 — Which GitHub account?** Your existing one, or a new one (a new one would register under sr7544068@gmail.com per your standing rule). Only you can perform the publish step either way.
+- **B1 — Publish at slice 0's exit**, iterating in public.
+- **B2 — Your existing GitHub account** hosts the repo.
 
-## What you do now
+## Status
 
-Read this brief (~5 min). Reply **lock** (with B1 + B2), **revise: <what>**, or **abandon**. On "lock": 2–3 quiz questions from this brief first — then the next invocation starts BUILD SL0.
+LOCKED 2026-07-28 after the 2-question quiz (both answered clean, no re-asks). Next: BUILD SL0 — starts when you invoke it.
