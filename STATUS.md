@@ -1,6 +1,6 @@
 # STATUS — mini-kafka (public name, resolved at SPEC lock)
 
-**Updated: 2026-07-24.** Project authority for this repo. Lab/process view: `~/skills/process/LAB-STATE.md`.
+**Updated: 2026-07-28.** Project authority for this repo. Lab/process view: `~/skills/process/LAB-STATE.md`.
 
 ## Where things stand
 
@@ -12,8 +12,9 @@
 - **SLICES: LOCKED v1.0.1** (restamp + redaction, SL0 gate). 8 slices, 24.5d, A–K owned exactly once. Hash: `273187dc7b2c9b9cf5d9a22d1aba1a25922dacba988dc9806e2d3a9f40136cd3`. Read `SLICES-BRIEF.md`.
 - Locked by Sri after the 2-question quiz (clean). Gate decisions: **B1 — publish at SL0 exit (public early) · B2 — Sri's existing GitHub account.** Lie-hunt record: 4 seats = 33 findings, all integrated (v0.1's skeleton had no broker; sizing under ~1.6x).
 - **SL0 (walking skeleton): PASSED at Sri's gate 2026-07-28** (verdict: pass; erratum E1 accepted; email redaction accepted; module renamed to github.com/systemcnu/mini-kafka). 51 tests green (race-checked), red-before-green receipted (216-line receipt), ack-ordering sabotage witnessed red and restored, scenario B live transcript committed, full local CI battery green, code map 84/84 anchors. Read `slices/SL0/BRIEF.md`.
-- **Open partial proofs (SD-5 tracking):** LOG-1/PROD-2 half (b) kill -9 → SL1 · LOG-4 scripted-fault proofs → SL1 · CONS-1 multi-entry service → SL2 · TOP-2 doc-audit half → SL6. CI-green-on-GitHub: CLOSED 2026-07-28 (run green on 82fa448 — staticcheck caught 2 dead helpers on the first real run; fixed).
-- **PUBLISHED: github.com/systemcnu/mini-kafka (public, CI green at HEAD).** Sri authorized on-their-behalf pushes for this repo (2026-07-28). **Next: SL1 (crash & disk hardening) when invoked.** Showcase feasibility: PASS receipt on file.
+- **SL1 (crash & disk hardening): BUILT & VERIFIED 2026-07-28 — AWAITING SRI'S GATE.** Slice design FINALIZED after 2-seat independent review (9 findings, all integrated; worst: the draft's truncate-back could brick a partition on a post-rename frontier-write failure — shipped rule scoped per D-SL1-3). Built: storagetest fault fakes, full recovery matrix, degrade()+truncate-back, broker FS seam + wire code-11 proof, topic-create abort tests, kill -9 harness (3 SIGKILL cycles, 44 journaled acks re-verified after every kill). 80 tests green race-checked (up from 51), red-before-green receipted per file, exit sabotage witnessed red (defense-in-depth guard also caught it), scenario J live on a 10 MB APFS image (receipt). Read `slices/SL1/BRIEF.md`.
+- **Open partial proofs (SD-5 tracking):** LOG-1/PROD-2 half (b) kill -9 — CLOSED by SL1 (pending gate) · LOG-4 scripted-fault proofs — CLOSED by SL1 (pending gate) · CONS-1 multi-entry service → SL2 · TOP-2 doc-audit half → SL6. CI-green-on-GitHub: CLOSED 2026-07-28 (run green on 82fa448 — staticcheck caught 2 dead helpers on the first real run; fixed).
+- **PUBLISHED: github.com/systemcnu/mini-kafka (public, CI green at HEAD).** Sri authorized on-their-behalf pushes for this repo (2026-07-28). **Next: Sri's SL1 gate verdict; on pass, SL2 (consumer groups) when invoked.** Showcase feasibility: PASS receipt on file.
 
 ## Grill record
 
