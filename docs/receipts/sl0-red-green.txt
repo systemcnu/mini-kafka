@@ -74,3 +74,50 @@ FAIL
 $ go test ./internal/storage/ -count=1
 ok  	mini-kafka/internal/storage	0.361s
 
+=== internal/storage/partition_test.go — RED (LOG-1a vs deliberately-early-acking flusher sabotage) — Tue Jul 28 11:50:58 CDT 2026 ===
+$ go test ./internal/storage/ -run 'TestAckNeverPrecedesCoveringSync|TestAppendAssigns|TestFetchAtTail' -count=1
+--- FAIL: TestAckNeverPrecedesCoveringSync (0.07s)
+    partition_test.go:117: ack for offset 1 with frontier 0 < 42 (ack precedes covering sync)
+    partition_test.go:117: ack for offset 2 with frontier 0 < 63 (ack precedes covering sync)
+    partition_test.go:117: ack for offset 0 with frontier 0 < 21 (ack precedes covering sync)
+    partition_test.go:128: round 0: 3 acks recorded while the covering fsync was still pending
+FAIL
+FAIL	mini-kafka/internal/storage	0.451s
+FAIL
+
+=== internal/storage/partition_test.go — GREEN (early-ack sabotage removed; ack strictly follows covering sync + frontier advance) — Tue Jul 28 11:51:16 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -race
+ok  	mini-kafka/internal/storage	1.517s
+
+=== internal/storage/recovery_test.go + store_test.go — RED (Store missing; non-fresh boot scan unimplemented) — Tue Jul 28 11:53:31 CDT 2026 ===
+$ go test ./internal/storage/ -count=1
+# mini-kafka/internal/storage [mini-kafka/internal/storage.test]
+internal/storage/store_test.go:13:47: undefined: Store
+internal/storage/store_test.go:15:12: undefined: Open
+internal/storage/store_test.go:56:57: undefined: ErrBadPartition
+internal/storage/store_test.go:59:55: undefined: ErrUnknownTopic
+internal/storage/store_test.go:69:53: undefined: ErrTopicExists
+internal/storage/store_test.go:128:32: undefined: MaxPartitionsPerTopic
+internal/storage/store_test.go:129:52: undefined: ErrBadPartitionCount
+internal/storage/store_test.go:133:31: undefined: MaxPartitionsPerTopic
+FAIL	mini-kafka/internal/storage [build failed]
+FAIL
+
+=== internal/storage/recovery_test.go + store_test.go — GREEN — Tue Jul 28 11:54:32 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -race
+ok  	mini-kafka/internal/storage	2.891s
+
+=== internal/broker/broker_test.go — RED (server/handlers missing) — Tue Jul 28 11:56:30 CDT 2026 ===
+$ go test ./internal/broker/ -count=1
+# mini-kafka/internal/broker [mini-kafka/internal/broker.test]
+internal/broker/broker_test.go:15:49: undefined: Server
+internal/broker/broker_test.go:17:12: undefined: New
+internal/broker/broker_test.go:17:16: undefined: Config
+internal/broker/broker_test.go:28:34: undefined: Server
+FAIL	mini-kafka/internal/broker [build failed]
+FAIL
+
+=== internal/broker/broker_test.go — GREEN — Tue Jul 28 11:58:19 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -race
+ok  	mini-kafka/internal/broker	1.882s
+
