@@ -11,7 +11,9 @@
 - Locked by Sri after the 3-question quiz (two clean, disk-error question answered correctly on its one re-ask). Lie-hunt record: 4 seats (coverage 8, buildability 9, simplicity 10, Codex platform-reality 10) = 37 findings — all integrated, one declined with written reason (DESIGN §10).
 - **SLICES: LOCKED v1.0 (2026-07-28).** 8 slices SL0–SL7, 24.5d command-summed, scenarios A–K owned exactly once, all 26 DD rows cited, partial-proof convention in force. Hash: `5d456de56e33afca5c7b54b240f0ae971aac1f926883c2bde5b7d96f4c28f4a4`. Read `SLICES-BRIEF.md`.
 - Locked by Sri after the 2-question quiz (clean). Gate decisions: **B1 — publish at SL0 exit (public early) · B2 — Sri's existing GitHub account.** Lie-hunt record: 4 seats = 33 findings, all integrated (v0.1's skeleton had no broker; sizing under ~1.6x).
-- **Next: BUILD SL0 (walking skeleton, 5d) — allowed now, starts when invoked.** Its preflight must verify all THREE hashes above. Open partial-proof halves are tracked per slice as they run.
+- **SL0 (walking skeleton): BUILT + VERIFIED — AT THE SLICE GATE (2026-07-28).** 51 tests green (race-checked), red-before-green receipted (216-line receipt), ack-ordering sabotage witnessed red and restored, scenario B live transcript committed, full local CI battery green, code map 84/84 anchors. Read `slices/SL0/BRIEF.md`.
+- **Open partial proofs (SD-5 tracking):** LOG-1/PROD-2 half (b) kill -9 → SL1 · LOG-4 scripted-fault proofs → SL1 · CONS-1 multi-entry service → SL2 · TOP-2 doc-audit half → SL6 · CI-green-on-GitHub → publish step.
+- **At the gate:** slice verdict + erratum E1 (DESIGN §7 crash-walk row 2 wording vs DD-4's normative algorithm — no behavior change) + the publish step (needs Sri's GitHub username + push; showcase feasibility receipt: PASS).
 
 ## Grill record
 
