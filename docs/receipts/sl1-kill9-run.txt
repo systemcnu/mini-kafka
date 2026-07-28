@@ -1,5 +1,11 @@
-=== SL1 kill -9 harness run (go test ./internal/e2e/ -count=1 -v) — Tue Jul 28 15:37:49 CDT 2026 ===
+=== SL1 kill -9 harness run (go test ./internal/e2e/ -count=1 -v) — Tue Jul 28 15:40:34 CDT 2026 ===
 === RUN   TestKill9CrashCycles
---- PASS: TestKill9CrashCycles (1.09s)
+    crash_test.go:233: cycle 0 partition 0: 20 journaled acks, 20 fetched records (0 unjournaled surplus)
+    crash_test.go:233: cycle 0 partition 1: 16 journaled acks, 16 fetched records (0 unjournaled surplus)
+    crash_test.go:233: cycle 1 partition 0: 23 journaled acks, 23 fetched records (0 unjournaled surplus)
+    crash_test.go:233: cycle 1 partition 1: 19 journaled acks, 23 fetched records (4 unjournaled surplus)
+    crash_test.go:233: cycle 2 partition 0: 24 journaled acks, 26 fetched records (2 unjournaled surplus)
+    crash_test.go:233: cycle 2 partition 1: 20 journaled acks, 26 fetched records (6 unjournaled surplus)
+--- PASS: TestKill9CrashCycles (2.85s)
 PASS
-ok  	github.com/systemcnu/mini-kafka/internal/e2e	1.288s
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	3.125s

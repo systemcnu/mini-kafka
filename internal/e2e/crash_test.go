@@ -229,6 +229,9 @@ func TestKill9CrashCycles(t *testing.T) {
 		verifier := startBroker(t, bin, dataDir)
 		for part := uint32(0); part < partitions; part++ {
 			recs := fetchToTail(t, verifier.addr, part)
+			// Receipt evidence: what this cycle actually proved, in numbers.
+			t.Logf("cycle %d partition %d: %d journaled acks, %d fetched records (%d unjournaled surplus)",
+				cycle, part, len(j.snapshot(part)), len(recs), len(recs)-len(j.snapshot(part)))
 			// Density is asserted of the FETCHED offsets only — dense by
 			// recovery construction — never of the journal.
 			fetched := make(map[uint64]string, len(recs))
