@@ -78,7 +78,6 @@ func ReadFrame(r io.Reader, max uint32) (typ byte, payload []byte, err error) {
 // [u32 n] blobs.
 type buf struct{ b []byte }
 
-func (w *buf) u8(v byte)     { w.b = append(w.b, v) }
 func (w *buf) u16(v uint16)  { w.b = binary.BigEndian.AppendUint16(w.b, v) }
 func (w *buf) u32(v uint32)  { w.b = binary.BigEndian.AppendUint32(w.b, v) }
 func (w *buf) u64(v uint64)  { w.b = binary.BigEndian.AppendUint64(w.b, v) }
@@ -112,14 +111,6 @@ func (r *reader) take(n int) []byte {
 	out := r.b[r.off : r.off+n]
 	r.off += n
 	return out
-}
-
-func (r *reader) u8() byte {
-	b := r.take(1)
-	if b == nil {
-		return 0
-	}
-	return b[0]
 }
 
 func (r *reader) u16() uint16 {
