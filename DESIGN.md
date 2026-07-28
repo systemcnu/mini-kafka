@@ -1,7 +1,7 @@
 # DESIGN — mini-kafka
 
-**Status: LOCKED v1.0 (2026-07-28). DD rows frozen. Changes only via errata cascade.**
-**Upstream: SPEC LOCKED v1.0, sha256 `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9` — verified at preflight.**
+**Status: LOCKED v1.0.1 (erratum E1 2026-07-28, accepted by Sri at the SL0 exit gate: crash-walk row 2 wording aligned to DD-4's normative algorithm — no behavior change). DD rows frozen.**
+**Upstream: SPEC LOCKED v1.0.1, sha256 `50237dd479caf8bbf7268d92304699efaaf0ed9834646d483bf3d018e313dcfe` — verified at preflight.**
 Locked by Sri at the gate 2026-07-28 after the 3-question quiz (two clean, one re-ask answered correctly). Zero decisions were open; all DD rows accepted by silence.
 v0.1 → v0.2: 37 lie-hunt findings integrated (4 seats — coverage 8, buildability 9, simplicity 10, Codex platform-reality 10). Biggest changes: split control/fetch connections, read visibility capped at the durable frontier, atomic checksummed frontier, multi-partition fetch, immediate rebalance (join window deleted), externally-measured demo clock, name validation, showcase loading shim.
 
@@ -80,7 +80,7 @@ mini-kafka/
 | Killed mid… | On restart |
 |---|---|
 | append, pre-fsync | invalid/short record past frontier → truncated; nothing was acked (DD-4) |
-| post-fsync(log), pre-frontier | CRC-valid records past stale frontier → truncated; **never acked** (ack strictly follows frontier write) — and never served either (DD-5 read cap) |
+| post-fsync(log), pre-frontier | CRC-valid records past the stale frontier are **kept but hidden** (DD-5 read cap) until a later fsync advances the frontier over them; truncation begins only at the first invalid record (DD-4's normative rule). **Never acked** (ack strictly follows frontier write), so a producer retry may duplicate (R2) |
 | frontier atomicWrite | rename is atomic: old or new frontier, never torn (DD-4/DD-9) |
 | post-frontier, pre-ack | data + frontier durable, client unacked → client retry → duplicate (R2, correct) |
 | commit write | atomicWrite: old or new commit file (DD-13); worst case re-delivery (R2) |

@@ -86,7 +86,7 @@ Five independent fresh-eyes reviewers — four Claude seats plus Codex (differen
 2. **License — MIT.**
 3. **Benchmark modes — durable-only.**
 4. **Showcase — kept conditional** against the free tier's realities (sleeps, ~1-min wake, data resets).
-Also standing: if a new GitHub account is needed it registers under sr7544068@gmail.com; an existing account is your call.
+Also standing: a new GitHub account would use your designated registration email; you chose your existing account.
 
 ## Status
 

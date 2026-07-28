@@ -8,7 +8,7 @@ import (
 	"net"
 	"testing"
 
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 // startBroker runs a broker on an ephemeral loopback port over dataDir.

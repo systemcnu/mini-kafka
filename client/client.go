@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net"
 
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 // DefaultAddr mirrors the broker's default loopback listen address (DD-24).

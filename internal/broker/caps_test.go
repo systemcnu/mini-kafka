@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 func TestOversizedFrameRejectedThenClosed(t *testing.T) {

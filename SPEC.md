@@ -1,6 +1,6 @@
 # SPEC — mini-kafka
 
-**Status: LOCKED v1.0 (2026-07-24). IDs frozen. Changes only via errata cascade.**
+**Status: LOCKED v1.0.1 (erratum 2026-07-28, accepted by Sri at the SL0 exit gate: D11 wording redacted for publication — no decision changed). IDs frozen. Changes only via errata cascade.**
 Locked by Sri at the gate 2026-07-24 after the 3-question quiz (two re-asks, both then answered on the brief's exact lines) and four gate decisions, resolved in §7.
 v0.1 → v0.2: 46 lie-hunt findings integrated (5 seats — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8, Codex feasibility 9); new IDs LOG-5, CONS-3, GRP-5, PROT-3, SHOW-4, NFR-4. v0.2 → v1.0: gate decisions A1–A4 resolved; no requirement text changed.
 
@@ -147,7 +147,7 @@ Platform reality on record (Codex, 2026-07): the one credible no-card option is 
 | D8 | Visitor path is Go-native: `go run ./cmd/demo`, `go run ./cmd/bench` — no make/bash/curl anywhere a visitor goes. Prebuilt binaries a bonus. | "Only Go installed" must be literally true, cross-platform. | If non-Go visitors matter, releases become a required path. |
 | D9 | Single broker process, single node (restates U5/U6). | Tier choice. | None; replication is out. |
 | D10 | Benchmarks: committed reference report from Sri's stated hardware + harness for visitors to reproduce locally. | Honest and free. | Server-grade numbers would need rented hardware — new scope. |
-| D11 | GitHub hosts; repo public early (it IS the deliverable). New account → sr7544068@gmail.com per standing rule; existing-account choice is Sri's at the gate. | Portfolio needs a public home. | Publishing later just shifts OPS-2/3 timing. |
+| D11 | GitHub hosts; repo public early (it IS the deliverable). A new account would register under Sri's designated registration email (standing rule); existing-account choice is Sri's at the gate. | Portfolio needs a public home. | Publishing later just shifts OPS-2/3 timing. |
 | D12 | Name "mini-kafka" — RESOLVED at lock (A1): Sri keeps it, trademark note acknowledged; now user-stated. | Naming a public artifact is the user's call. | Rename is cheap pre-publication, annoying after. |
 | D13 | Committed offset = NEXT offset to read (Kafka convention), stated in §1b and the protocol doc. | Kills a silent off-by-one that tests can't catch. | None — any consistent convention works, but it must be one. |
 | D14 | A group with no committed offset starts at the earliest offset. | Fan-out demo (Scenario F) works by contract, not luck. | Kafka defaults to latest; earliest is friendlier for a demo. |

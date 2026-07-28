@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"mini-kafka/client"
+	"github.com/systemcnu/mini-kafka/client"
 )
 
 func main() {

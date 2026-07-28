@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"mini-kafka/client"
-	"mini-kafka/internal/broker"
+	"github.com/systemcnu/mini-kafka/client"
+	"github.com/systemcnu/mini-kafka/internal/broker"
 )
 
 func startBroker(t *testing.T) string {

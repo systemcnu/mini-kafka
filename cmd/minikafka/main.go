@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"mini-kafka/internal/broker"
+	"github.com/systemcnu/mini-kafka/internal/broker"
 )
 
 func main() {

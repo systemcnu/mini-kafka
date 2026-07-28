@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 func waitForCond(t *testing.T, cond func() bool, what string) {

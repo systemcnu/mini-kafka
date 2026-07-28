@@ -6,8 +6,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+module=$(go list -m)
 nonstd=$(go list -deps -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./... |
-	sed '/^$/d' | grep -v -E '^mini-kafka(/|$)' || true)
+	sed '/^$/d' | grep -v -F -e "$module" || true)
 
 if [ -n "$nonstd" ]; then
 	echo "non-stdlib dependencies found:"

@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"mini-kafka/internal/storage"
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/storage"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 // Defaults (DD-24, D-SL0-7/8).

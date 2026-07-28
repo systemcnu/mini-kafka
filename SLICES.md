@@ -1,8 +1,8 @@
 # SLICES — mini-kafka
 
-**Status: LOCKED v1.0 (2026-07-28). Slice cut frozen. Changes only via errata cascade.**
+**Status: LOCKED v1.0.1 (restamp + redaction 2026-07-28, accepted at the SL0 exit gate — no slice content changed). Slice cut frozen.**
 Locked by Sri at the gate 2026-07-28 after the 2-question quiz (both answered correctly, no re-asks) and two gate decisions, resolved in §5.
-**Upstream: SPEC LOCKED v1.0 `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9` · DESIGN LOCKED v1.0 `47bef8647c97c2b810f31ab8770d59cfc7b425030462a10402f3d7cceacfc72a` — both verified at preflight.**
+**Upstream: SPEC LOCKED v1.0.1 `50237dd479caf8bbf7268d92304699efaaf0ed9834646d483bf3d018e313dcfe` · DESIGN LOCKED v1.0.1 `5d48d8ac7b795ca4306d0cd5eca3038ef3cded4fafb5f0ce789c4b99df6eae08` — both verified at preflight.**
 v0.1 → v0.2: 33 lie-hunt findings integrated (4 seats — coverage 7, verticality 6, sizing 10, Codex cut-order 10). Restructured: broker + safety edges + seams + LICENSE/README + CI baseline all moved into SL0; scenario C re-owned by SL2; demo moved ahead of hostile-input completeness; showcase feasibility check pulled early; sizing re-estimated honestly (15.5d → 24.5d, process overhead now budgeted).
 
 ## 1. The cut
@@ -95,4 +95,4 @@ Each slice: design+plan under the slice skills → red-before-green build → sa
 ## 5. Open at this gate (Sri decides)
 
 - **B1 — Publish when?** At SL0 exit with LICENSE + truthful README, iterating in public (recommended — matches locked DESIGN D11 "public early"; honest commit history is itself portfolio material) — or after SL3 when the 60-second demo works.
-- **B2 — Which GitHub account?** Your existing account, or a new one (which per your standing rule would register under sr7544068@gmail.com). Only you can perform the publish step either way.
+- **B2 — Which GitHub account?** Your existing account, or a new one (per the standing registration-email rule). Only you can perform the publish step either way.

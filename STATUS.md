@@ -4,16 +4,16 @@
 
 ## Where things stand
 
-- **SPEC: LOCKED v1.0 (2026-07-24).** 37 active IDs, scenarios A–K, ledger U1–U8 + D1–D19 (all accepted at lock). Hash: `2b002d99cf9248021ca1ca0bf7cf228ce22cecf5328e70a4827759de3de023c9`. Read `SPEC-BRIEF.md`.
+- **SPEC: LOCKED v1.0.1** (locked 2026-07-24; v1.0.1 redaction erratum 2026-07-28, accepted at the SL0 gate). 37 active IDs. Hash: `50237dd479caf8bbf7268d92304699efaaf0ed9834646d483bf3d018e313dcfe`. Read `SPEC-BRIEF.md`.
 - Locked by Sri after the 3-question quiz (two re-asks, both then answered on the brief's exact lines) and four gate decisions, recorded in SPEC §7: name stays "mini-kafka" · MIT license · durable-only benchmarks · showcase kept conditional.
 - Lie-hunt record: 5 seats (4 Claude — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8 — plus Codex feasibility 9) = 46 findings, all integrated or gate-resolved. Orphan-ID audit clean.
-- **DESIGN: LOCKED v1.0 (2026-07-28).** 26 DD rows, coverage map 37/37 (command-audited), zero open decisions — all accepted by silence. Hash: `47bef8647c97c2b810f31ab8770d59cfc7b425030462a10402f3d7cceacfc72a`. Read `DESIGN-BRIEF.md`.
+- **DESIGN: LOCKED v1.0.1** (locked 2026-07-28; erratum E1 accepted at the SL0 gate — crash-walk wording, no behavior change). 26 DD rows, coverage 37/37. Hash: `5d48d8ac7b795ca4306d0cd5eca3038ef3cded4fafb5f0ce789c4b99df6eae08`. Read `DESIGN-BRIEF.md`.
 - Locked by Sri after the 3-question quiz (two clean, disk-error question answered correctly on its one re-ask). Lie-hunt record: 4 seats (coverage 8, buildability 9, simplicity 10, Codex platform-reality 10) = 37 findings — all integrated, one declined with written reason (DESIGN §10).
-- **SLICES: LOCKED v1.0 (2026-07-28).** 8 slices SL0–SL7, 24.5d command-summed, scenarios A–K owned exactly once, all 26 DD rows cited, partial-proof convention in force. Hash: `5d456de56e33afca5c7b54b240f0ae971aac1f926883c2bde5b7d96f4c28f4a4`. Read `SLICES-BRIEF.md`.
+- **SLICES: LOCKED v1.0.1** (restamp + redaction, SL0 gate). 8 slices, 24.5d, A–K owned exactly once. Hash: `273187dc7b2c9b9cf5d9a22d1aba1a25922dacba988dc9806e2d3a9f40136cd3`. Read `SLICES-BRIEF.md`.
 - Locked by Sri after the 2-question quiz (clean). Gate decisions: **B1 — publish at SL0 exit (public early) · B2 — Sri's existing GitHub account.** Lie-hunt record: 4 seats = 33 findings, all integrated (v0.1's skeleton had no broker; sizing under ~1.6x).
-- **SL0 (walking skeleton): BUILT + VERIFIED — AT THE SLICE GATE (2026-07-28).** 51 tests green (race-checked), red-before-green receipted (216-line receipt), ack-ordering sabotage witnessed red and restored, scenario B live transcript committed, full local CI battery green, code map 84/84 anchors. Read `slices/SL0/BRIEF.md`.
+- **SL0 (walking skeleton): PASSED at Sri's gate 2026-07-28** (verdict: pass; erratum E1 accepted; email redaction accepted; module renamed to github.com/systemcnu/mini-kafka). 51 tests green (race-checked), red-before-green receipted (216-line receipt), ack-ordering sabotage witnessed red and restored, scenario B live transcript committed, full local CI battery green, code map 84/84 anchors. Read `slices/SL0/BRIEF.md`.
 - **Open partial proofs (SD-5 tracking):** LOG-1/PROD-2 half (b) kill -9 → SL1 · LOG-4 scripted-fault proofs → SL1 · CONS-1 multi-entry service → SL2 · TOP-2 doc-audit half → SL6 · CI-green-on-GitHub → publish step.
-- **At the gate:** slice verdict + erratum E1 (DESIGN §7 crash-walk row 2 wording vs DD-4's normative algorithm — no behavior change) + the publish step (needs Sri's GitHub username + push; showcase feasibility receipt: PASS).
+- **Next: Sri's publish push (commands below in git), then SL1 (crash & disk hardening) when invoked.** Showcase feasibility: PASS receipt on file.
 
 ## Grill record
 

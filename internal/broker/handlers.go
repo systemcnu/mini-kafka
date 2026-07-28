@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"mini-kafka/internal/storage"
-	"mini-kafka/internal/wire"
+	"github.com/systemcnu/mini-kafka/internal/storage"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 // Live input caps (D-SL0-8). Frame caps live in wire; storage owns the
