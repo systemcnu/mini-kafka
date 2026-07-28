@@ -44,6 +44,11 @@ type Server struct {
 	connMu sync.Mutex
 	conns  map[net.Conn]chan struct{} // conn → its cancel channel
 
+	// inflight counts requests between frame-read and response-write; Stop
+	// waits (bounded) for it to reach zero before force-closing conns so
+	// released parked fetches and final acks actually reach their clients.
+	inflight atomic.Int64
+
 	wg sync.WaitGroup
 }
 
@@ -101,6 +106,10 @@ func (s *Server) Stop() {
 		s.store.Drain(drainTimeout)
 		if err := s.store.Close(); err != nil {
 			log.Printf("closing storage: %v", err)
+		}
+		deadline := time.Now().Add(drainTimeout)
+		for time.Now().Before(deadline) && s.inflight.Load() > 0 {
+			time.Sleep(time.Millisecond)
 		}
 		s.connMu.Lock()
 		for conn, cancel := range s.conns {
@@ -161,29 +170,34 @@ func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}) {
 			// Partial frame / clean close: just close (debug log only).
 			return
 		}
-		if s.draining.Load() {
-			if !s.writeError(conn, wire.Errf(wire.CodeShuttingDown, "broker is shutting down")) {
-				return
-			}
-			continue
-		}
-		respType, respBody, werr, closeAfter := s.dispatch(typ, payload, cancel)
-		if werr != nil {
-			if !s.writeError(conn, werr) {
-				return
-			}
-			if closeAfter {
-				return // e.g. unknown type: Error then close (D-SL0-2)
-			}
-			continue
-		}
-		if closeAfter {
-			return // canceled park or unservable read: drop the conn
-		}
-		if err := wire.WriteFrame(conn, respType, respBody); err != nil {
+		if !s.serveRequest(conn, typ, payload, cancel) {
 			return
 		}
 	}
+}
+
+// serveRequest handles one framed request end-to-end; false means drop the
+// connection. The inflight window spans dispatch AND response write so a
+// graceful stop never closes a conn under a response in transit.
+func (s *Server) serveRequest(conn net.Conn, typ byte, payload []byte, cancel <-chan struct{}) bool {
+	s.inflight.Add(1)
+	defer s.inflight.Add(-1)
+
+	if s.draining.Load() {
+		return s.writeError(conn, wire.Errf(wire.CodeShuttingDown, "broker is shutting down"))
+	}
+	respType, respBody, werr, closeAfter := s.dispatch(typ, payload, cancel)
+	if werr != nil {
+		if !s.writeError(conn, werr) {
+			return false
+		}
+		// closeAfter with an error: e.g. unknown type (D-SL0-2).
+		return !closeAfter
+	}
+	if closeAfter {
+		return false // canceled park or unservable read: drop the conn
+	}
+	return wire.WriteFrame(conn, respType, respBody) == nil
 }
 
 func (s *Server) writeError(conn net.Conn, werr *wire.Error) bool {

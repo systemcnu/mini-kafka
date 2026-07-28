@@ -121,3 +121,96 @@ FAIL
 $ go test ./internal/broker/ -count=1 -race
 ok  	mini-kafka/internal/broker	1.882s
 
+=== internal/storage/longpoll_test.go — RED (sabotage: visibility advanced on raw append, before covering fsync) — Tue Jul 28 12:00:26 CDT 2026 ===
+$ go test ./internal/storage/ -run TestParkedFetchWakesOnFrontierAdvanceNotRawAppend -count=1
+--- FAIL: TestParkedFetchWakesOnFrontierAdvanceNotRawAppend (0.08s)
+    longpoll_test.go:52: AdvanceHook fired (frontier 15) while the fsync was still gated
+FAIL
+FAIL	mini-kafka/internal/storage	0.358s
+FAIL
+
+=== internal/storage/longpoll_test.go — GREEN (sabotage removed; visibility swap strictly after fsync + frontier atomicWrite) — Tue Jul 28 12:00:45 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -race
+ok  	mini-kafka/internal/storage	2.861s
+
+=== internal/broker/shutdown_test.go — RED (sabotage: Stop never closes the stopping channel) — Tue Jul 28 12:01:46 CDT 2026 ===
+$ go test ./internal/broker/ -run TestParkedFetchReturnsEmptyOnGracefulStop -count=1
+--- FAIL: TestParkedFetchReturnsEmptyOnGracefulStop (5.06s)
+    shutdown_test.go:51: reading the drained fetch response: EOF
+FAIL
+FAIL	mini-kafka/internal/broker	5.366s
+FAIL
+
+=== internal/broker/shutdown_test.go — GREEN (stopping channel restored; parked fetch released with empty shape before conns close) — Tue Jul 28 12:02:00 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -race
+ok  	mini-kafka/internal/broker	1.835s
+
+=== client/client_test.go — RED (client implementation missing) — Tue Jul 28 12:02:56 CDT 2026 ===
+$ go test ./client/ -count=1
+# mini-kafka/client_test [mini-kafka/client.test]
+client/client_test.go:30:23: undefined: client.DialAdmin
+client/client_test.go:43:19: undefined: client.DialProducer
+client/client_test.go:55:19: undefined: client.DialConsumer
+client/client_test.go:76:19: undefined: client.DialProducer
+client/client_test.go:83:19: undefined: client.Error
+client/client_test.go:84:51: undefined: client.CodeUnknownTopic
+FAIL	mini-kafka/client [build failed]
+
+=== client/client_test.go — GREEN — Tue Jul 28 12:03:25 CDT 2026 ===
+$ go test ./client/ -count=1 -race
+ok  	mini-kafka/client	1.483s
+
+=== step 9 demonstration — mk four commands against a live broker — Tue Jul 28 12:04:53 CDT 2026 ===
+$ minikafka --addr 127.0.0.1:7641 --data <tmp> &  then mk create-topic/topics/produce(-m and stdin)/consume/consume -f, then SIGTERM
+created topic demo with 2 partition(s)
+demo	2
+produce -m -> 0 ; stdin lines -> 1 2
+consume: 0 hello-from-mk / 1 line-one / 2 line-two (exits at tail)
+consume -f: same three then 3 followed-message (long-poll wake)
+broker log: listening -> signal received, stopping gracefully -> stopped
+
+=== internal/broker/caps_test.go — RED (sabotage: FETCH_TOO_WIDE cap check removed) — Tue Jul 28 12:05:45 CDT 2026 ===
+$ go test ./internal/broker/ -run 'TestFetchCapRejections' -count=1
+--- FAIL: TestFetchCapRejections (0.05s)
+    caps_test.go:87: error code 8 (multi-entry fetch arrives with groups), want 9
+FAIL
+FAIL	mini-kafka/internal/broker	0.362s
+FAIL
+
+=== internal/broker/caps_test.go — GREEN (cap check restored; full caps battery + conn guard + NFR-4) — Tue Jul 28 12:05:56 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -race -v -run 'TestOversized|TestFetchCap|TestCreateTopicCap|TestTopicCountCap|TestConnectionCapGuard|TestNFR4'
+=== RUN   TestOversizedFrameRejectedThenClosed
+--- PASS: TestOversizedFrameRejectedThenClosed (0.00s)
+=== RUN   TestOversizedPayloadRejectedAndNothingWritten
+--- PASS: TestOversizedPayloadRejectedAndNothingWritten (0.08s)
+=== RUN   TestFetchCapRejections
+--- PASS: TestFetchCapRejections (0.05s)
+=== RUN   TestCreateTopicCapRejections
+--- PASS: TestCreateTopicCapRejections (0.01s)
+=== RUN   TestTopicCountCap
+--- PASS: TestTopicCountCap (2.82s)
+=== RUN   TestConnectionCapGuard
+--- PASS: TestConnectionCapGuard (0.00s)
+=== RUN   TestNFR4LoopbackOnlyByDefault
+    caps_test.go:209: dial [fe80::1]:7621 correctly failed: dial tcp [fe80::1]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::10ca:b267:e35b:3011]:7621 correctly failed: dial tcp [fe80::10ca:b267:e35b:3011]:7621: i/o timeout
+    caps_test.go:209: dial [2601:2c7:4701:3680:4b0:5d49:7790:ccfd]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:4b0:5d49:7790:ccfd]:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680:8992:13d2:c28f:27cd]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:8992:13d2:c28f:27cd]:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680::3c30]:7621 correctly failed: dial tcp [2601:2c7:4701:3680::3c30]:7621: connect: connection refused
+    caps_test.go:209: dial 10.0.0.71:7621 correctly failed: dial tcp 10.0.0.71:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680:35e0:5644:61cf:13ae]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:35e0:5644:61cf:13ae]:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680:9cc4:fd2a:47a2:70ed]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:9cc4:fd2a:47a2:70ed]:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680:3c60:920:ad70:d044]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:3c60:920:ad70:d044]:7621: connect: connection refused
+    caps_test.go:209: dial [2601:2c7:4701:3680:f0d7:bd4:7cd8:69b]:7621 correctly failed: dial tcp [2601:2c7:4701:3680:f0d7:bd4:7cd8:69b]:7621: connect: connection refused
+    caps_test.go:209: dial [fe80::1c8f:74ff:fe7e:10c4]:7621 correctly failed: dial tcp [fe80::1c8f:74ff:fe7e:10c4]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::1c8f:74ff:fe7e:10c4]:7621 correctly failed: dial tcp [fe80::1c8f:74ff:fe7e:10c4]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::de99:13e9:bd90:6fe3]:7621 correctly failed: dial tcp [fe80::de99:13e9:bd90:6fe3]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::c337:3fd8:c086:da5]:7621 correctly failed: dial tcp [fe80::c337:3fd8:c086:da5]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::5413:7c6d:14dd:6198]:7621 correctly failed: dial tcp [fe80::5413:7c6d:14dd:6198]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::ce81:b1c:bd2c:69e]:7621 correctly failed: dial tcp [fe80::ce81:b1c:bd2c:69e]:7621: connect: no route to host
+    caps_test.go:209: dial [fe80::347d:7baa:e7b2:4142]:7621 correctly failed: dial tcp [fe80::347d:7baa:e7b2:4142]:7621: connect: no route to host
+
+(caps battery result line, full suite:)
+$ go test ./internal/broker/ -count=1 -race
+ok  	mini-kafka/internal/broker	5.647s
+
