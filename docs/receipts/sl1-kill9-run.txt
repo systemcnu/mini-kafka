@@ -1,0 +1,5 @@
+=== SL1 kill -9 harness run (go test ./internal/e2e/ -count=1 -v) — Tue Jul 28 15:37:49 CDT 2026 ===
+=== RUN   TestKill9CrashCycles
+--- PASS: TestKill9CrashCycles (1.09s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	1.288s
