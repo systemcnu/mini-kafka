@@ -134,3 +134,18 @@ $ go test ./internal/storage/... -count=1
 ok  	github.com/systemcnu/mini-kafka/internal/storage	3.091s
 ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.440s
 
+=== internal/broker/writefailed_test.go — RED (sabotage: ErrWriteRejected mapped to CodeMalformed instead of code 11) — Tue Jul 28 15:33:43 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestProduceOnFaultedStore
+--- FAIL: TestProduceOnFaultedStoreGetsWriteFailedAndFetchStillServes (0.12s)
+    writefailed_test.go:42: error code 7 (partition is write-rejecting until restart), want 11
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	0.343s
+FAIL
+
+=== internal/broker/writefailed_test.go — GREEN (sabotage restored) — Tue Jul 28 15:33:55 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -v -run TestProduceOnFaultedStore
+=== RUN   TestProduceOnFaultedStoreGetsWriteFailedAndFetchStillServes
+--- PASS: TestProduceOnFaultedStoreGetsWriteFailedAndFetchStillServes (0.11s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	0.317s
+

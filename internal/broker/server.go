@@ -55,6 +55,13 @@ type Server struct {
 // New opens the data directory (running boot recovery; a refused partition
 // aborts loudly here) and prepares a broker. It does not listen yet.
 func New(cfg Config) (*Server, error) {
+	return newWithFS(cfg, storage.OSFS(), storage.FileSyncer{})
+}
+
+// newWithFS is the D-SL1-4 seam: New over an injectable FS/Syncer so tests
+// can script storage faults through a real listening broker. Test-constructor
+// only — no flag, no runtime configurability.
+func newWithFS(cfg Config, fsys storage.FS, syncer storage.Syncer) (*Server, error) {
 	if cfg.Addr == "" {
 		cfg.Addr = DefaultAddr
 	}
@@ -64,7 +71,7 @@ func New(cfg Config) (*Server, error) {
 	if cfg.MaxConns == 0 {
 		cfg.MaxConns = DefaultMaxConns
 	}
-	store, err := storage.Open(cfg.DataDir, storage.OSFS(), storage.FileSyncer{})
+	store, err := storage.Open(cfg.DataDir, fsys, syncer)
 	if err != nil {
 		return nil, err
 	}
