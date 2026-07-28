@@ -45,3 +45,9 @@ go build -o bin/mk ./cmd/mk
 
 `scripts/checks.sh` runs the full local battery: build, vet, gofmt check,
 stdlib audit, tests, and a `GOOS=linux` cross-compile.
+
+An interactive code map — the runtime story, guided journeys (produce,
+long-poll fetch, boot recovery, graceful stop), and editor deep-links —
+lives at [docs/code-map.html](docs/code-map.html) (open it in a browser).
+Refresh it with `python3 scripts/gen_code_map.py`; the generator re-resolves
+every source anchor and refuses to write if any is stale.
