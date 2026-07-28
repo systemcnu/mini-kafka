@@ -1,0 +1,31 @@
+=== internal/storage/storagetest/fault_test.go — RED (sabotage: OpenAppend returns the unwrapped File, so File.Write/Sync scripts can never fire — the step-1 pitfall) — Tue Jul 28 15:26:54 CDT 2026 ===
+$ go test ./internal/storage/storagetest/ -count=1
+--- FAIL: TestShortWriteLeavesFileReallyShort (0.00s)
+    fault_test.go:77: scripted short write = 10, <nil>; want 3, ENOSPC
+--- FAIL: TestWriteFailureWithZeroShortNWritesNothing (0.00s)
+    fault_test.go:104: scripted write = 4, <nil>; want 0, EIO
+--- FAIL: TestFileSyncScriptFiresOnNthMatchingCall (0.01s)
+    fault_test.go:126: sync 2 = <nil>, want EIO
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.278s
+FAIL
+
+=== internal/storage/storagetest/fault_test.go — GREEN (sabotage restored) — Tue Jul 28 15:27:04 CDT 2026 ===
+$ go test ./internal/storage/storagetest/ -count=1 -v
+=== RUN   TestWriteFileAtomicFailureLeavesOldOrNewNeverTorn
+--- PASS: TestWriteFileAtomicFailureLeavesOldOrNewNeverTorn (0.05s)
+=== RUN   TestShortWriteLeavesFileReallyShort
+--- PASS: TestShortWriteLeavesFileReallyShort (0.00s)
+=== RUN   TestWriteFailureWithZeroShortNWritesNothing
+--- PASS: TestWriteFailureWithZeroShortNWritesNothing (0.00s)
+=== RUN   TestFileSyncScriptFiresOnNthMatchingCall
+--- PASS: TestFileSyncScriptFiresOnNthMatchingCall (0.01s)
+=== RUN   TestFSOpScriptsFireOncePerArming
+--- PASS: TestFSOpScriptsFireOncePerArming (0.01s)
+=== RUN   TestFaultSyncerFailsNthFromArming
+--- PASS: TestFaultSyncerFailsNthFromArming (0.01s)
+=== RUN   TestNotFoundContractPassesThrough
+--- PASS: TestNotFoundContractPassesThrough (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.264s
+
