@@ -105,7 +105,7 @@ func (f *FaultFS) arm(op, suffix string, nth int, err error, shortN int) {
 // check counts a call of op on path against EVERY live matching script —
 // each keeps its own nth counter — and returns the first fault that fires.
 // A fired script is spent.
-func (f *FaultFS) check(op, path string) (error, int) {
+func (f *FaultFS) check(op, path string) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var err error
@@ -120,11 +120,11 @@ func (f *FaultFS) check(op, path string) (error, int) {
 			err, shortN = s.err, s.shortN
 		}
 	}
-	return err, shortN
+	return shortN, err
 }
 
 func (f *FaultFS) OpenAppend(path string) (storage.File, error) {
-	if err, _ := f.check(opOpenAppend, path); err != nil {
+	if _, err := f.check(opOpenAppend, path); err != nil {
 		return nil, err
 	}
 	file, err := f.inner.OpenAppend(path)
@@ -138,7 +138,7 @@ func (f *FaultFS) OpenRead(path string) (storage.File, error) { return f.inner.O
 func (f *FaultFS) ReadFile(path string) ([]byte, error)       { return f.inner.ReadFile(path) }
 
 func (f *FaultFS) WriteFileAtomic(path string, data []byte) error {
-	err, _ := f.check(opWriteFileAtomic, path)
+	_, err := f.check(opWriteFileAtomic, path)
 	if err == nil {
 		return f.inner.WriteFileAtomic(path, data)
 	}
@@ -156,7 +156,7 @@ func (f *FaultFS) WriteFileAtomic(path string, data []byte) error {
 }
 
 func (f *FaultFS) Truncate(path string, size int64) error {
-	if err, _ := f.check(opTruncate, path); err != nil {
+	if _, err := f.check(opTruncate, path); err != nil {
 		return err
 	}
 	return f.inner.Truncate(path, size)
@@ -168,7 +168,7 @@ func (f *FaultFS) RemoveAll(path string) error                { return f.inner.R
 func (f *FaultFS) ReadDir(path string) ([]fs.DirEntry, error) { return f.inner.ReadDir(path) }
 
 func (f *FaultFS) SyncDir(path string) error {
-	if err, _ := f.check(opSyncDir, path); err != nil {
+	if _, err := f.check(opSyncDir, path); err != nil {
 		return err
 	}
 	return f.inner.SyncDir(path)
@@ -183,7 +183,7 @@ type FaultFile struct {
 }
 
 func (f *FaultFile) Write(p []byte) (int, error) {
-	err, shortN := f.fs.check(opWrite, f.path)
+	shortN, err := f.fs.check(opWrite, f.path)
 	if err == nil {
 		return f.File.Write(p)
 	}
@@ -204,7 +204,7 @@ func (f *FaultFile) Write(p []byte) (int, error) {
 }
 
 func (f *FaultFile) Sync() error {
-	if err, _ := f.fs.check(opSync, f.path); err != nil {
+	if _, err := f.fs.check(opSync, f.path); err != nil {
 		return err
 	}
 	return f.File.Sync()

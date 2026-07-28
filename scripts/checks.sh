@@ -10,6 +10,10 @@ go build ./...
 echo "== vet"
 go vet ./...
 
+echo "== staticcheck (pinned, same as CI)"
+# go run keeps the tool out of go.mod; the module cache makes reruns fast.
+go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+
 echo "== gofmt check"
 unformatted=$(gofmt -l .)
 if [ -n "$unformatted" ]; then
