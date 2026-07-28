@@ -9,7 +9,9 @@
 - Lie-hunt record: 5 seats (4 Claude — ambiguity 10, untestability 10, gaps 9, contradiction/goal-fit 8 — plus Codex feasibility 9) = 46 findings, all integrated or gate-resolved. Orphan-ID audit clean.
 - **DESIGN: LOCKED v1.0 (2026-07-28).** 26 DD rows, coverage map 37/37 (command-audited), zero open decisions — all accepted by silence. Hash: `47bef8647c97c2b810f31ab8770d59cfc7b425030462a10402f3d7cceacfc72a`. Read `DESIGN-BRIEF.md`.
 - Locked by Sri after the 3-question quiz (two clean, disk-error question answered correctly on its one re-ask). Lie-hunt record: 4 seats (coverage 8, buildability 9, simplicity 10, Codex platform-reality 10) = 37 findings — all integrated, one declined with written reason (DESIGN §10).
-- **Next stage: SLICES — allowed now, starts when invoked.** Its preflight must verify BOTH hashes above.
+- **SLICES: DRAFT v0.2 (2026-07-28) — AT THE GATE, awaiting Sri's verdict.** 8 slices SL0–SL7, 24.5d command-summed (process overhead budgeted), scenarios A–K owned exactly once, all 26 DD rows cited, partial-proof convention in force. Read `SLICES-BRIEF.md` (~5 min, roadmap diagram).
+- SLICES lie-hunt: 4 seats (coverage 7, verticality 6, sizing 10, Codex cut-order 10) = 33 findings, all integrated — v0.1's skeleton had no broker in its build list; sizing was under by ~1.6x. Preflight verified both upstream hashes.
+- **Open at the gate: B1 publish timing · B2 GitHub account.** Everything else locks by silence.
 
 ## Grill record
 
