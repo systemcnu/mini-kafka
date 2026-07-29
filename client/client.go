@@ -466,6 +466,43 @@ func (g *GroupConsumer) Commit() error {
 	return nil
 }
 
+// Assignment returns a sorted snapshot, taken under the client mutex, of
+// the partitions this member currently owns (D-SL3-2). The snapshot moves
+// when a re-join adopts a new assignment — so it changes after the Poll
+// that heals a rebalance, not at the broker's bump instant.
+func (g *GroupConsumer) Assignment() []uint32 {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	parts := make([]uint32, 0, len(g.cursors))
+	for p := range g.cursors {
+		parts = append(parts, p)
+	}
+	sort.Slice(parts, func(i, j int) bool { return parts[i] < parts[j] })
+	return parts
+}
+
+// Abandon is the DD-20 kill: an ungraceful death with no LeaveGroup and no
+// goodbye. Sequence pinned by D-SL3-2: close both raw conns LOCK-FREE —
+// the close IS the kill instant, and a concurrent net.Conn.Close is what
+// unblocks this member's own Poll parked server-side up to 7 s holding the
+// fetch mutex (taking a mutex first would turn SIGKILL into a polite
+// wait) — then stop and join the heartbeat goroutine. All inside the
+// closeOnce shared with Close, so Abandon and Close are mutually
+// idempotent and nothing leaks. Broker-side, only the control conn's drop
+// is the death event (only Join binds connID→member); the fetch conn's
+// drop is a no-op.
+func (g *GroupConsumer) Abandon() {
+	g.closeOnce.Do(func() {
+		_ = g.ctl.c.Close()
+		// Deliberately unsynchronized read (the pinned lock-free rule): if
+		// it races Poll's rare redial, the worst case is closing the conn
+		// being retired — the member is already dead via the control conn.
+		_ = g.fetchConn.c.Close()
+		close(g.hbStop)
+		<-g.hbDone
+	})
+}
+
 // Close stops the heartbeat loop, leaves the group (best effort — a swept
 // member legally gets 13 here), and closes both connections.
 func (g *GroupConsumer) Close() error {

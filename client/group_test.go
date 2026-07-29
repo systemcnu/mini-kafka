@@ -307,6 +307,116 @@ func TestSecondGroupGetsFullStreamFromZero(t *testing.T) {
 	}
 }
 
+// waitAssignment polls c until its Assignment() snapshot equals want (the
+// rebalance is adopted lazily, so polling is what drives the re-join).
+func waitAssignment(t *testing.T, c *client.GroupConsumer, deadline time.Duration, want []uint32) {
+	t.Helper()
+	end := time.Now().Add(deadline)
+	for time.Now().Before(end) {
+		if equalParts(c.Assignment(), want) {
+			return
+		}
+		if _, err := c.Poll(200 * time.Millisecond); err != nil {
+			t.Fatalf("Poll while waiting for assignment %v: %v", want, err)
+		}
+	}
+	t.Fatalf("assignment never settled to %v (last snapshot %v)", want, c.Assignment())
+}
+
+func equalParts(got, want []uint32) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestAssignmentSnapshotAcrossRebalance pins D-SL3-2(b): Assignment()
+// returns the sorted owned-partition snapshot, and it tracks a rebalance —
+// solo owner of all 4, then the settled 2+2 split after a second join.
+func TestAssignmentSnapshotAcrossRebalance(t *testing.T) {
+	addr := startBroker(t)
+	admin, err := client.DialAdmin(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	if err := admin.CreateTopic("t", 4); err != nil {
+		t.Fatal(err)
+	}
+
+	c1, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c1.Close()
+	if got := c1.Assignment(); !equalParts(got, []uint32{0, 1, 2, 3}) {
+		t.Fatalf("solo member Assignment() = %v, want [0 1 2 3]", got)
+	}
+
+	c2, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+	// The second joiner's join response already carries the settled upper
+	// range (sorted memberIDs × contiguous ranges, DD-11).
+	if got := c2.Assignment(); !equalParts(got, []uint32{2, 3}) {
+		t.Fatalf("second member Assignment() = %v, want [2 3]", got)
+	}
+	// c1 adopts its half lazily via Poll.
+	waitAssignment(t, c1, 10*time.Second, []uint32{0, 1})
+}
+
+// TestAbandonKillsMemberAndSurvivorTakesOver is D-SL3-2(a)'s unit
+// (F2-corrected): after Abandon, Commit returns a NON-NIL error (the conn
+// is closed client-side — a literal 13 cannot reach a closed socket), the
+// survivor ends up owning all 4 partitions (the death proof), and
+// Abandon/Close are mutually idempotent via the shared closeOnce. Abandon
+// returning at all proves the heartbeat goroutine was joined (it waits on
+// hbDone). Run under -race.
+func TestAbandonKillsMemberAndSurvivorTakesOver(t *testing.T) {
+	addr := startBroker(t)
+	admin, err := client.DialAdmin(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	if err := admin.CreateTopic("t", 4); err != nil {
+		t.Fatal(err)
+	}
+
+	c1, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c1.Close()
+	c2, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitAssignment(t, c1, 10*time.Second, []uint32{0, 1})
+	waitAssignment(t, c2, 10*time.Second, []uint32{2, 3})
+
+	c2.Abandon()
+	if err := c2.Commit(); err == nil {
+		t.Fatal("Commit after Abandon returned nil, want a non-nil error (conn closed client-side)")
+	}
+	// Control-conn drop is the death event (DD-10): the survivor's next
+	// polls re-join into sole ownership of all 4.
+	waitAssignment(t, c1, 10*time.Second, []uint32{0, 1, 2, 3})
+
+	// Mutual idempotence: Close after Abandon is a shared-closeOnce no-op.
+	if err := c2.Close(); err != nil {
+		t.Fatalf("Close after Abandon: %v", err)
+	}
+	c2.Abandon() // and Abandon again is a no-op too
+}
+
 // TestControlConnSerializationUnderRace hammers Commit and Poll while the
 // heartbeat goroutine ticks — the control-conn mutex must serialize WHOLE
 // roundtrips (write+read), or the one-in-flight protocol corrupts. Run
