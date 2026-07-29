@@ -316,3 +316,27 @@ $ go test ./client/ -race -count=1 -v
 PASS
 ok  	github.com/systemcnu/mini-kafka/client	3.489s
 
+=== step 7 mk-smoke transcript — live broker, real mk binaries — Wed Jul 29 11:45:10 CDT 2026 ===
+$ mk create-topic -addr 127.0.0.1:7999 -t smoke -p 2
+created topic smoke with 2 partition(s)
+$ mk produce -addr 127.0.0.1:7999 -t smoke -p 0 -m one
+0
+$ mk produce -addr 127.0.0.1:7999 -t smoke -p 0 -m two
+1
+$ mk produce -addr 127.0.0.1:7999 -t smoke -p 1 -m three
+0
+$ mk consume -addr 127.0.0.1:7999 -t smoke -g cli   # killed after 3 s; prints partition<TAB>offset<TAB>payload, commits per batch
+0	0	one
+0	1	two
+1	0	three
+$ mk produce -addr 127.0.0.1:7999 -t smoke -p 1 -m four
+1
+$ mk consume -addr 127.0.0.1:7999 -t smoke -g cli   # second run resumes from the committed positions: only the new record
+1	1	four
+$ mk consume -addr 127.0.0.1:7999 -t smoke -g cli -p 1   # -p with -g rejected loudly
+mk consume: -p cannot be combined with -g: assignment comes from the group
+(exit 1)
+$ cat data/_groups/cli.json   # the committed positions on disk (DD-13)
+{"topic":"smoke","offsets":{"0":2,"1":2}}
+=== end mk-smoke ===
+

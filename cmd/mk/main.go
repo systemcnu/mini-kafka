@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/systemcnu/mini-kafka/client"
 )
@@ -44,7 +45,10 @@ commands:
   topics       [-addr host:port]
   produce      -t <topic> -p <partition> [-m <msg>] [-addr host:port]
                (without -m, one message per stdin line)
-  consume      -t <topic> -p <partition> [-o <offset>] [-f] [-addr host:port]`)
+  consume      -t <topic> -p <partition> [-o <offset>] [-f] [-addr host:port]
+  consume      -t <topic> -g <group> [-addr host:port]
+               (group mode: assignment comes from the group; polls forever,
+               prints partition<TAB>offset<TAB>payload, commits per batch)`)
 }
 
 func cmdCreateTopic(args []string) error {
@@ -132,9 +136,24 @@ func cmdConsume(args []string) error {
 	partition := fs.Uint("p", 0, "partition")
 	offset := fs.Uint64("o", 0, "start offset")
 	follow := fs.Bool("f", false, "long-poll for new records instead of exiting at the tail")
+	group := fs.String("g", "", "consumer group; assignment comes from the group (excludes -p/-o)")
 	fs.Parse(args)
 	if *topic == "" {
 		return fmt.Errorf("-t is required")
+	}
+	if *group != "" {
+		// -p/-o would be silently meaningless with -g (the group assigns
+		// partitions and positions): reject the combination loudly.
+		var conflict string
+		fs.Visit(func(f *flag.Flag) {
+			if f.Name == "p" || f.Name == "o" {
+				conflict = f.Name
+			}
+		})
+		if conflict != "" {
+			return fmt.Errorf("-%s cannot be combined with -g: assignment comes from the group", conflict)
+		}
+		return consumeGroup(*addr, *group, *topic)
 	}
 	c, err := client.DialConsumer(*addr)
 	if err != nil {
@@ -160,6 +179,32 @@ func cmdConsume(args []string) error {
 		}
 		if len(recs) == 0 && !*follow {
 			return nil
+		}
+	}
+}
+
+// consumeGroup is the SLICES demo surface: join the group, poll forever,
+// print each record, commit per batch. Records are printed BEFORE the
+// batch commits, and errors — fencing included — surface verbatim through
+// main's error path (D-SL2-8/10: no auto-heal before surfacing).
+func consumeGroup(addr, group, topic string) error {
+	gc, err := client.JoinGroup(addr, group, topic)
+	if err != nil {
+		return err
+	}
+	defer gc.Close()
+	for {
+		recs, err := gc.Poll(5 * time.Second)
+		if err != nil {
+			return err
+		}
+		for _, r := range recs {
+			fmt.Printf("%d\t%d\t%s\n", r.Partition, r.Offset, r.Payload)
+		}
+		if len(recs) > 0 {
+			if err := gc.Commit(); err != nil {
+				return err
+			}
 		}
 	}
 }
