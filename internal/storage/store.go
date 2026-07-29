@@ -204,6 +204,18 @@ func (s *Store) Topics() []TopicInfo {
 	return out
 }
 
+// TopicPartitions returns a live topic's partition count (the broker's
+// group-join validation needs it before any group state changes).
+func (s *Store) TopicPartitions(name string) (uint32, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.topics[name]
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrUnknownTopic, name)
+	}
+	return t.meta.Partitions, nil
+}
+
 // Partition resolves (topic, index) to its live partition.
 func (s *Store) Partition(name string, index uint32) (*Partition, error) {
 	s.mu.RLock()

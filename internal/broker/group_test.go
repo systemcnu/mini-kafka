@@ -8,6 +8,7 @@ package broker
 import (
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -227,6 +228,330 @@ func TestMultiEntryEmptyShapeOneGroupPerEntry(t *testing.T) {
 		if len(g.Recs) != 0 {
 			t.Errorf("group %d has %d recs, want 0 (empty-at-timeout shape)", i, len(g.Recs))
 		}
+	}
+}
+
+// --- Step-5 half: the fencing suite (D-SL2-6, GRP-5, PROT-3 rows) ---
+
+func mustJoinGroup(t *testing.T, conn net.Conn, groupName, topic string) wire.JoinGroupResp {
+	t.Helper()
+	typ, body := roundtrip(t, conn, wire.TypeJoinGroup, wire.JoinGroup{Group: groupName, Topic: topic}.Encode())
+	if typ != wire.TypeJoinGroupResp {
+		t.Fatalf("join response type %d, body %x", typ, body)
+	}
+	resp, werr := wire.DecodeJoinGroupResp(body)
+	if werr != nil {
+		t.Fatalf("decode join resp: %v", werr)
+	}
+	return resp
+}
+
+func mustHeartbeat(t *testing.T, conn net.Conn, groupName, memberID string, generation uint64) wire.HeartbeatResp {
+	t.Helper()
+	typ, body := roundtrip(t, conn, wire.TypeHeartbeat, wire.Heartbeat{Group: groupName, MemberID: memberID, Generation: generation}.Encode())
+	if typ != wire.TypeHeartbeatResp {
+		t.Fatalf("heartbeat response type %d, body %x", typ, body)
+	}
+	resp, werr := wire.DecodeHeartbeatResp(body)
+	if werr != nil {
+		t.Fatalf("decode heartbeat resp: %v", werr)
+	}
+	return resp
+}
+
+func commitBody(groupName, memberID string, generation uint64, offsets map[uint32]uint64) []byte {
+	m := wire.CommitOffsets{Group: groupName, MemberID: memberID, Generation: generation}
+	for p, n := range offsets {
+		m.Entries = append(m.Entries, wire.CommitEntry{Partition: p, Next: n})
+	}
+	return m.Encode()
+}
+
+func groupFetchBody(groupName, memberID string, generation uint64, partitions []wire.FetchEntry, maxWaitMs uint32) []byte {
+	return wire.GroupFetch{Group: groupName, MemberID: memberID, Generation: generation,
+		Entries: partitions, MaxWaitMs: maxWaitMs}.Encode()
+}
+
+// nextByPartition indexes a join response's resume offsets.
+func nextByPartition(resp wire.JoinGroupResp) map[uint32]uint64 {
+	out := make(map[uint32]uint64, len(resp.Assigned))
+	for _, a := range resp.Assigned {
+		out[a.Partition] = a.NextOffset
+	}
+	return out
+}
+
+// TestGroupJoinFetchCommitLeaveRoundtrip is the happy path over real TCP:
+// join carries state (DD-14), GroupFetch serves owned partitions, an acked
+// commit is visible at the next join, leave fences the member.
+func TestGroupJoinFetchCommitLeaveRoundtrip(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	conn := dialBroker(t, s)
+	mustCreateTopic(t, conn, "orders", 4)
+	mustProduce(t, conn, "orders", 0, "r0")
+	mustProduce(t, conn, "orders", 0, "r1")
+
+	join := mustJoinGroup(t, conn, "workers", "orders")
+	if join.MemberID == "" || join.Generation != 1 || len(join.Assigned) != 4 {
+		t.Fatalf("join = %+v, want a member owning all 4 partitions at generation 1", join)
+	}
+	for _, a := range join.Assigned {
+		if a.NextOffset != 0 {
+			t.Fatalf("fresh group resume offset for partition %d = %d, want 0 (D14 earliest)", a.Partition, a.NextOffset)
+		}
+	}
+
+	// GroupFetch across all owned partitions on a second conn (the client's
+	// fetch-conn shape, DD-19).
+	fetchConn := dialBroker(t, s)
+	entries := make([]wire.FetchEntry, 0, 4)
+	for _, a := range join.Assigned {
+		entries = append(entries, wire.FetchEntry{Partition: a.Partition, Offset: a.NextOffset})
+	}
+	typ, body := roundtrip(t, fetchConn, wire.TypeGroupFetch, groupFetchBody("workers", join.MemberID, join.Generation, entries, 1000))
+	if typ != wire.TypeFetchResp {
+		t.Fatalf("group fetch response type %d, body %x", typ, body)
+	}
+	resp, werr := wire.DecodeFetchResp(body)
+	if werr != nil {
+		t.Fatal(werr)
+	}
+	total := 0
+	for _, g := range resp.Groups {
+		total += len(g.Recs)
+	}
+	if len(resp.Groups) != 4 || total != 2 {
+		t.Fatalf("group fetch = %d groups %d recs, want 4 groups carrying the 2 records", len(resp.Groups), total)
+	}
+
+	// Commit next-to-read for partition 0, then re-join: the commit is the
+	// resume point (CONS-2's next-to-read semantics at the wire).
+	if typ, _ = roundtrip(t, conn, wire.TypeCommitOffsets, commitBody("workers", join.MemberID, join.Generation, map[uint32]uint64{0: 2})); typ != wire.TypeCommitOffsetsResp {
+		t.Fatalf("commit response type %d, want CommitOffsetsResp", typ)
+	}
+	rejoin := mustJoinGroup(t, conn, "workers", "orders")
+	if rejoin.MemberID != join.MemberID {
+		t.Fatalf("re-join changed memberID %s → %s", join.MemberID, rejoin.MemberID)
+	}
+	if got := nextByPartition(rejoin)[0]; got != 2 {
+		t.Fatalf("resume offset after commit = %d, want 2", got)
+	}
+
+	if hb := mustHeartbeat(t, conn, "workers", join.MemberID, rejoin.Generation); hb.Flags&wire.HeartbeatRejoin != 0 {
+		t.Fatalf("REJOIN bit set for a current member (flags %d)", hb.Flags)
+	}
+	if typ, _ = roundtrip(t, conn, wire.TypeLeaveGroup, wire.LeaveGroup{Group: "workers", MemberID: join.MemberID}.Encode()); typ != wire.TypeLeaveGroupResp {
+		t.Fatalf("leave response type %d, want LeaveGroupResp", typ)
+	}
+	expectError(t, conn, wire.TypeHeartbeat,
+		wire.Heartbeat{Group: "workers", MemberID: join.MemberID, Generation: rejoin.Generation}.Encode(),
+		wire.CodeUnknownMember)
+}
+
+// TestStaleGenerationFetchAndCommitRejected is GRP-5 at the wire: codes 12
+// live for fetch AND commit, with zero state change proven by re-reading
+// positions, and the broker serving normal traffic after every rejection
+// (PROT-3).
+func TestStaleGenerationFetchAndCommitRejected(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	connA := dialBroker(t, s)
+	mustCreateTopic(t, connA, "orders", 4)
+	joinA := mustJoinGroup(t, connA, "workers", "orders") // generation 1
+	connB := dialBroker(t, s)
+	mustJoinGroup(t, connB, "workers", "orders") // generation 2: A is stale now
+
+	// Keep A live through the assertions (heartbeats are fence-exempt).
+	mustHeartbeat(t, connA, "workers", joinA.MemberID, joinA.Generation)
+
+	one := []wire.FetchEntry{{Partition: 0, Offset: 0}}
+	expectError(t, connA, wire.TypeGroupFetch,
+		groupFetchBody("workers", joinA.MemberID, joinA.Generation, one, 1), wire.CodeStaleGeneration)
+	expectError(t, connA, wire.TypeCommitOffsets,
+		commitBody("workers", joinA.MemberID, joinA.Generation, map[uint32]uint64{0: 9}), wire.CodeStaleGeneration)
+
+	// Zero state change: A's re-join shows partition 0 still at 0.
+	rejoinA := mustJoinGroup(t, connA, "workers", "orders")
+	if got := nextByPartition(rejoinA)[0]; got != 0 {
+		t.Fatalf("fenced commit changed the position: partition 0 = %d, want 0", got)
+	}
+	// The broker serves normal traffic after the rejections.
+	mustProduce(t, connA, "orders", 0, "still-alive")
+}
+
+// TestUnknownMemberAlwaysGets13 pins D-SL2-6's precedence at the wire: an
+// unknown or dead member sees 13 on fetch, commit, and heartbeat — even
+// with a stale generation, where 12 would also match (13 before 12).
+func TestUnknownMemberAlwaysGets13(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	conn := dialBroker(t, s)
+	mustCreateTopic(t, conn, "orders", 2)
+	join := mustJoinGroup(t, conn, "workers", "orders") // generation 1
+	conn2 := dialBroker(t, s)
+	mustJoinGroup(t, conn2, "workers", "orders") // generation 2
+
+	one := []wire.FetchEntry{{Partition: 0, Offset: 0}}
+	// Never-seen memberID, current generation.
+	expectError(t, conn, wire.TypeGroupFetch, groupFetchBody("workers", "m999", 2, one, 1), wire.CodeUnknownMember)
+	expectError(t, conn, wire.TypeHeartbeat,
+		wire.Heartbeat{Group: "workers", MemberID: "m999", Generation: 2}.Encode(), wire.CodeUnknownMember)
+	// Unknown group.
+	expectError(t, conn, wire.TypeCommitOffsets,
+		commitBody("ghosts", "m1", 1, map[uint32]uint64{0: 1}), wire.CodeUnknownMember)
+
+	// A DEAD member with a STALE generation: 13 wins over 12.
+	if typ, _ := roundtrip(t, conn, wire.TypeLeaveGroup, wire.LeaveGroup{Group: "workers", MemberID: join.MemberID}.Encode()); typ != wire.TypeLeaveGroupResp {
+		t.Fatal("leave failed")
+	}
+	expectError(t, conn, wire.TypeCommitOffsets,
+		commitBody("workers", join.MemberID, join.Generation, map[uint32]uint64{0: 1}), wire.CodeUnknownMember)
+	expectError(t, conn, wire.TypeGroupFetch,
+		groupFetchBody("workers", join.MemberID, join.Generation, one, 1), wire.CodeUnknownMember)
+}
+
+// TestHeartbeatExemptFromGenerationFence is F1's wire-level proof: a live
+// member heartbeating with a stale generation gets the level-triggered
+// REJOIN bit — never 12 — repeatedly, until it re-joins.
+func TestHeartbeatExemptFromGenerationFence(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	connA := dialBroker(t, s)
+	mustCreateTopic(t, connA, "orders", 2)
+	joinA := mustJoinGroup(t, connA, "workers", "orders")
+	connB := dialBroker(t, s)
+	mustJoinGroup(t, connB, "workers", "orders") // A is behind now
+
+	for i := 0; i < 3; i++ {
+		hb := mustHeartbeat(t, connA, "workers", joinA.MemberID, joinA.Generation)
+		if hb.Flags&wire.HeartbeatRejoin == 0 {
+			t.Fatalf("heartbeat %d: REJOIN bit clear for a behind member (or 12 served)", i)
+		}
+	}
+	rejoinA := mustJoinGroup(t, connA, "workers", "orders")
+	if hb := mustHeartbeat(t, connA, "workers", joinA.MemberID, rejoinA.Generation); hb.Flags&wire.HeartbeatRejoin != 0 {
+		t.Fatal("REJOIN bit still set after re-join")
+	}
+}
+
+// TestParkedGroupFetchRefencedOnWake: a GroupFetch parked across a
+// rebalance re-validates on wake and serves 12 — the one honest route to
+// STALE_GENERATION for a live member (D-SL2-6), with no generation-bump
+// wake (DD-11).
+func TestParkedGroupFetchRefencedOnWake(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	ctl := dialBroker(t, s)
+	mustCreateTopic(t, ctl, "orders", 2)
+	join := mustJoinGroup(t, ctl, "workers", "orders")
+
+	// Park the member's GroupFetch at both tails on its fetch conn.
+	fetchConn := dialBroker(t, s)
+	entries := []wire.FetchEntry{{Partition: 0, Offset: 0}, {Partition: 1, Offset: 0}}
+	if err := wire.WriteFrame(fetchConn, wire.TypeGroupFetch,
+		groupFetchBody("workers", join.MemberID, join.Generation, entries, 10_000)); err != nil {
+		t.Fatal(err)
+	}
+	p0, err := s.store.Partition("orders", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForCond(t, func() bool { return p0.ParkedWaiters() == 1 }, "group fetch to park")
+
+	// A second member joins: generation bumps, the parked fetch does NOT
+	// wake (serve-time fencing, not bump-wakes). Keep member 1 live.
+	ctl2 := dialBroker(t, s)
+	mustJoinGroup(t, ctl2, "workers", "orders")
+	mustHeartbeat(t, ctl, "workers", join.MemberID, join.Generation)
+
+	// Frontier advance wakes the park → re-fence → 12 on the fetch conn.
+	mustProduce(t, ctl, "orders", 0, "wake")
+	fetchConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	typ, body, rerr := wire.ReadFrame(fetchConn, wire.MaxResponseFrame)
+	if rerr != nil {
+		t.Fatalf("reading woken group fetch: %v", rerr)
+	}
+	if typ != wire.TypeError {
+		t.Fatalf("woken group fetch response type %d, want Error{STALE_GENERATION}", typ)
+	}
+	em, werr := wire.DecodeErrorMsg(body)
+	if werr != nil || em.Code != uint16(wire.CodeStaleGeneration) {
+		t.Fatalf("woken group fetch error = %+v (%v), want code 12", em, werr)
+	}
+	// The fetch conn survives the rejection (PROT-3).
+	fetchConn.SetReadDeadline(time.Time{})
+	if typ, _ := roundtrip(t, fetchConn, wire.TypeListTopics, nil); typ != wire.TypeListTopicsResp {
+		t.Fatal("fetch conn dead after served 12")
+	}
+}
+
+// TestGroupJoinValidation: unknown topic → UNKNOWN_TOPIC, invalid group
+// name → INVALID_NAME, cross-topic join → MALFORMED naming the binding
+// (D-SL2-6, D15).
+func TestGroupJoinValidation(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	conn := dialBroker(t, s)
+	mustCreateTopic(t, conn, "orders", 2)
+
+	expectError(t, conn, wire.TypeJoinGroup,
+		wire.JoinGroup{Group: "workers", Topic: "ghost"}.Encode(), wire.CodeUnknownTopic)
+	expectError(t, conn, wire.TypeJoinGroup,
+		wire.JoinGroup{Group: "UPPER", Topic: "orders"}.Encode(), wire.CodeInvalidName)
+
+	mustJoinGroup(t, conn, "workers", "orders")
+	mustCreateTopic(t, conn, "other", 1)
+	conn2 := dialBroker(t, s)
+	typ, body := roundtrip(t, conn2, wire.TypeJoinGroup, wire.JoinGroup{Group: "workers", Topic: "other"}.Encode())
+	em, werr := wire.DecodeErrorMsg(body)
+	if typ != wire.TypeError || werr != nil || em.Code != uint16(wire.CodeMalformed) {
+		t.Fatalf("cross-topic join = type %d %+v, want MALFORMED", typ, em)
+	}
+	if !strings.Contains(em.Msg, "bound to topic orders") {
+		t.Fatalf("MALFORMED msg %q does not name the binding", em.Msg)
+	}
+}
+
+// TestGroupFetchCaps: the fetch caps hold for GroupFetch too — 0 entries
+// MALFORMED, >16 FETCH_TOO_WIDE, oversized maxWait CAP_EXCEEDED.
+func TestGroupFetchCaps(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	conn := dialBroker(t, s)
+	mustCreateTopic(t, conn, "orders", 2)
+	join := mustJoinGroup(t, conn, "workers", "orders")
+
+	expectError(t, conn, wire.TypeGroupFetch,
+		groupFetchBody("workers", join.MemberID, join.Generation, nil, 1), wire.CodeMalformed)
+	var many []wire.FetchEntry
+	for i := 0; i < MaxFetchEntries+1; i++ {
+		many = append(many, wire.FetchEntry{Partition: 0, Offset: 0})
+	}
+	expectError(t, conn, wire.TypeGroupFetch,
+		groupFetchBody("workers", join.MemberID, join.Generation, many, 1), wire.CodeFetchTooWide)
+	one := []wire.FetchEntry{{Partition: 0, Offset: 0}}
+	expectError(t, conn, wire.TypeGroupFetch,
+		groupFetchBody("workers", join.MemberID, join.Generation, one, MaxFetchWaitMs+1), wire.CodeCapExceeded)
+}
+
+// TestConnCloseTriggersImmediateRebalance proves the D-SL2-11 teardown
+// glue over real TCP: dropping a member's control conn is immediate death —
+// the survivor sees REJOIN and re-joins into full ownership, no session
+// timeout involved.
+func TestConnCloseTriggersImmediateRebalance(t *testing.T) {
+	s := startBroker(t, t.TempDir())
+	ctlA := dialBroker(t, s)
+	mustCreateTopic(t, ctlA, "orders", 4)
+	joinA := mustJoinGroup(t, ctlA, "workers", "orders")
+	ctlB := dialBroker(t, s)
+	joinB := mustJoinGroup(t, ctlB, "workers", "orders")
+	if len(joinB.Assigned) != 2 {
+		t.Fatalf("member B owns %d partitions, want 2 of 4", len(joinB.Assigned))
+	}
+
+	ctlB.Close() // abrupt drop, no LeaveGroup
+
+	waitForCond(t, func() bool {
+		hb := mustHeartbeat(t, ctlA, "workers", joinA.MemberID, joinA.Generation)
+		return hb.Flags&wire.HeartbeatRejoin != 0
+	}, "survivor to see REJOIN after the conn drop")
+	rejoinA := mustJoinGroup(t, ctlA, "workers", "orders")
+	if len(rejoinA.Assigned) != 4 {
+		t.Fatalf("survivor owns %d partitions after the drop, want all 4", len(rejoinA.Assigned))
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/systemcnu/mini-kafka/internal/group"
 	"github.com/systemcnu/mini-kafka/internal/storage"
 	"github.com/systemcnu/mini-kafka/internal/wire"
 )
@@ -25,7 +26,7 @@ const (
 // dispatch routes one request frame. On werr != nil the caller serves an
 // Error frame; closeAfter tells it to drop the connection afterwards
 // (unknown type, canceled park, unservable read).
-func (s *Server) dispatch(typ byte, payload []byte, cancel <-chan struct{}) (respType byte, respBody []byte, werr *wire.Error, closeAfter bool) {
+func (s *Server) dispatch(typ byte, payload []byte, cancel <-chan struct{}, connID uint64) (respType byte, respBody []byte, werr *wire.Error, closeAfter bool) {
 	switch typ {
 	case wire.TypeProduce:
 		respType, respBody, werr = s.handleProduce(payload)
@@ -38,8 +39,22 @@ func (s *Server) dispatch(typ byte, payload []byte, cancel <-chan struct{}) (res
 	case wire.TypeListTopics:
 		respType, respBody, werr = s.handleListTopics(payload)
 		return respType, respBody, werr, false
+	case wire.TypeJoinGroup:
+		respType, respBody, werr = s.handleJoinGroup(payload, connID)
+		return respType, respBody, werr, false
+	case wire.TypeHeartbeat:
+		respType, respBody, werr = s.handleHeartbeat(payload)
+		return respType, respBody, werr, false
+	case wire.TypeCommitOffsets:
+		respType, respBody, werr = s.handleCommitOffsets(payload)
+		return respType, respBody, werr, false
+	case wire.TypeLeaveGroup:
+		respType, respBody, werr = s.handleLeaveGroup(payload)
+		return respType, respBody, werr, false
+	case wire.TypeGroupFetch:
+		return s.handleGroupFetch(payload, cancel)
 	default:
-		// Unknown type: Error then close (D-SL0-2). Types 9+ are SL2's.
+		// Unknown type: Error then close (D-SL0-2).
 		return 0, nil, wire.Errf(wire.CodeMalformed, "unknown type %d", typ), true
 	}
 }
@@ -268,6 +283,156 @@ func (s *Server) handleListTopics(payload []byte) (byte, []byte, *wire.Error) {
 		resp.Topics = append(resp.Topics, wire.TopicInfo{Name: t.Name, Partitions: t.Partitions})
 	}
 	return wire.TypeListTopicsResp, resp.Encode(), nil
+}
+
+func (s *Server) handleJoinGroup(payload []byte, connID uint64) (byte, []byte, *wire.Error) {
+	m, werr := wire.DecodeJoinGroup(payload)
+	if werr != nil {
+		return 0, nil, werr
+	}
+	if err := wire.ValidateName(m.Group); err != nil {
+		return 0, nil, err.(*wire.Error)
+	}
+	if err := wire.ValidateName(m.Topic); err != nil {
+		return 0, nil, err.(*wire.Error)
+	}
+	// Unknown topic → UNKNOWN_TOPIC before any group state changes (D-SL2-6).
+	partitions, err := s.store.TopicPartitions(m.Topic)
+	if err != nil {
+		return 0, nil, storageError(err)
+	}
+	res, err := s.coord.Join(connID, m.Group, m.Topic, partitions)
+	if err != nil {
+		return 0, nil, groupError(err)
+	}
+	resp := wire.JoinGroupResp{MemberID: res.MemberID, Generation: res.Generation,
+		Assigned: make([]wire.AssignedPartition, 0, len(res.Assigned))}
+	for _, a := range res.Assigned {
+		resp.Assigned = append(resp.Assigned, wire.AssignedPartition{Partition: a.Partition, NextOffset: a.Next})
+	}
+	return wire.TypeJoinGroupResp, resp.Encode(), nil
+}
+
+func (s *Server) handleHeartbeat(payload []byte) (byte, []byte, *wire.Error) {
+	m, werr := wire.DecodeHeartbeat(payload)
+	if werr != nil {
+		return 0, nil, werr
+	}
+	if err := wire.ValidateName(m.Group); err != nil {
+		return 0, nil, err.(*wire.Error)
+	}
+	// m.Generation is carried but deliberately NOT fenced (D-SL2-6/F1):
+	// the REJOIN level is derived server-side; fencing heartbeats would
+	// make REJOIN undeliverable and falsely sweep live members.
+	rejoin, err := s.coord.Heartbeat(m.Group, m.MemberID)
+	if err != nil {
+		return 0, nil, groupError(err)
+	}
+	var flags uint8
+	if rejoin {
+		flags |= wire.HeartbeatRejoin
+	}
+	return wire.TypeHeartbeatResp, wire.HeartbeatResp{Flags: flags}.Encode(), nil
+}
+
+func (s *Server) handleCommitOffsets(payload []byte) (byte, []byte, *wire.Error) {
+	m, werr := wire.DecodeCommitOffsets(payload)
+	if werr != nil {
+		return 0, nil, werr
+	}
+	if err := wire.ValidateName(m.Group); err != nil {
+		return 0, nil, err.(*wire.Error)
+	}
+	offsets := make(map[uint32]uint64, len(m.Entries))
+	for _, e := range m.Entries {
+		offsets[e.Partition] = e.Next
+	}
+	// The ack frame below is only reachable after the atomicWrite (CONS-3).
+	if err := s.coord.Commit(m.Group, m.MemberID, m.Generation, offsets); err != nil {
+		return 0, nil, groupError(err)
+	}
+	return wire.TypeCommitOffsetsResp, nil, nil
+}
+
+func (s *Server) handleLeaveGroup(payload []byte) (byte, []byte, *wire.Error) {
+	m, werr := wire.DecodeLeaveGroup(payload)
+	if werr != nil {
+		return 0, nil, werr
+	}
+	if err := wire.ValidateName(m.Group); err != nil {
+		return 0, nil, err.(*wire.Error)
+	}
+	if err := s.coord.Leave(m.Group, m.MemberID); err != nil {
+		return 0, nil, groupError(err)
+	}
+	return wire.TypeLeaveGroupResp, nil, nil
+}
+
+func (s *Server) handleGroupFetch(payload []byte, cancel <-chan struct{}) (byte, []byte, *wire.Error, bool) {
+	m, werr := wire.DecodeGroupFetch(payload)
+	if werr != nil {
+		return 0, nil, werr, false
+	}
+	if err := wire.ValidateName(m.Group); err != nil {
+		return 0, nil, err.(*wire.Error), false
+	}
+	if len(m.Entries) == 0 {
+		return 0, nil, wire.Errf(wire.CodeMalformed, "group fetch requires at least one entry"), false
+	}
+	if len(m.Entries) > MaxFetchEntries {
+		return 0, nil, wire.Errf(wire.CodeFetchTooWide, "%d entries exceeds cap %d", len(m.Entries), MaxFetchEntries), false
+	}
+	if m.MaxWaitMs > MaxFetchWaitMs {
+		return 0, nil, wire.Errf(wire.CodeCapExceeded, "maxWaitMs %d exceeds cap %d", m.MaxWaitMs, MaxFetchWaitMs), false
+	}
+	if m.MaxBytes > MaxFetchBytes {
+		return 0, nil, wire.Errf(wire.CodeCapExceeded, "maxBytes %d exceeds cap %d", m.MaxBytes, MaxFetchBytes), false
+	}
+	maxWait := time.Duration(m.MaxWaitMs) * time.Millisecond
+	if m.MaxWaitMs == 0 {
+		maxWait = DefaultFetchWait * time.Millisecond
+	}
+	maxBytes := m.MaxBytes
+	if maxBytes == 0 {
+		maxBytes = DefaultFetchBytes
+	}
+	// The serve-time fence (DD-12) doubles as the topic lookup — GroupFetch
+	// carries no topic field; the group's binding supplies it (D-SL2-2).
+	refence := func() *wire.Error {
+		if _, err := s.coord.ValidateFetch(m.Group, m.MemberID, m.Generation); err != nil {
+			return groupError(err)
+		}
+		return nil
+	}
+	topic, err := s.coord.ValidateFetch(m.Group, m.MemberID, m.Generation)
+	if err != nil {
+		return 0, nil, groupError(err), false
+	}
+	targets, werr := s.resolveTargets(topic, m.Entries)
+	if werr != nil {
+		return 0, nil, werr, false
+	}
+	return s.fetchLoop(targets, maxBytes, maxWait, cancel, refence)
+}
+
+// groupError maps group-coordinator sentinels onto their pinned wire codes
+// (the group package never imports wire). Precedence is decided in the
+// coordinator (13 before 12, D-SL2-6); this is a pure translation.
+func groupError(err error) *wire.Error {
+	switch {
+	case errors.Is(err, group.ErrUnknownMember):
+		return wire.Errf(wire.CodeUnknownMember, "%v", err)
+	case errors.Is(err, group.ErrStaleGeneration):
+		return wire.Errf(wire.CodeStaleGeneration, "%v", err)
+	case errors.Is(err, group.ErrTopicMismatch), errors.Is(err, group.ErrCorruptCommits):
+		return wire.Errf(wire.CodeMalformed, "%v", err)
+	case errors.Is(err, group.ErrTooManyGroups), errors.Is(err, group.ErrTooManyMembers):
+		return wire.Errf(wire.CodeCapExceeded, "%v", err)
+	default:
+		// Commit-file persistence failures land here: the write failed, no
+		// ack was sent (CONS-3's contract holds).
+		return wire.Errf(wire.CodeWriteFailed, "internal group error: %v", err)
+	}
 }
 
 // storageError maps storage sentinels onto their pinned wire codes.

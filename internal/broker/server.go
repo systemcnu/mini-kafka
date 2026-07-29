@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/systemcnu/mini-kafka/internal/group"
 	"github.com/systemcnu/mini-kafka/internal/storage"
 	"github.com/systemcnu/mini-kafka/internal/wire"
 )
@@ -28,10 +29,11 @@ type Config struct {
 	MaxConns int
 }
 
-// Server is the broker: it owns the storage.Store and the listener. Create
-// with New, run with Start, stop (once) with Stop.
+// Server is the broker: it owns the storage.Store, the group coordinator,
+// and the listener. Create with New, run with Start, stop (once) with Stop.
 type Server struct {
 	store    *storage.Store
+	coord    *group.Coordinator
 	addr     string
 	maxConns int
 
@@ -43,6 +45,9 @@ type Server struct {
 
 	connMu sync.Mutex
 	conns  map[net.Conn]chan struct{} // conn → its cancel channel
+	// connSeq numbers connections for the coordinator's conn↔member binding
+	// (D-SL2-11): teardown reports the id, never the net.Conn.
+	connSeq atomic.Uint64
 
 	// inflight counts requests between frame-read and response-write; Stop
 	// waits (bounded) for it to reach zero before force-closing conns so
@@ -75,8 +80,15 @@ func newWithFS(cfg Config, fsys storage.FS, syncer storage.Syncer) (*Server, err
 	if err != nil {
 		return nil, err
 	}
+	coord, err := group.New(group.Config{}, cfg.DataDir, fsys)
+	if err != nil {
+		store.Close()
+		return nil, err
+	}
+	coord.Run()
 	return &Server{
 		store:      store,
+		coord:      coord,
 		addr:       cfg.Addr,
 		maxConns:   cfg.MaxConns,
 		acceptDone: make(chan struct{}),
@@ -109,6 +121,7 @@ func (s *Server) Stop() {
 		s.ln.Close()
 		<-s.acceptDone
 		s.draining.Store(true)
+		s.coord.Stop() // sweeper off; group requests already get SHUTTING_DOWN via draining
 		close(s.stopping)
 		s.store.Drain(drainTimeout)
 		if err := s.store.Close(); err != nil {
@@ -147,22 +160,26 @@ func (s *Server) acceptLoop() {
 		s.conns[conn] = cancel
 		s.connMu.Unlock()
 		s.wg.Add(1)
-		go s.serveConn(conn, cancel)
+		go s.serveConn(conn, cancel, s.connSeq.Add(1))
 	}
 }
 
 // dropConn removes conn from the registry on EVERY exit path — a missed
-// decrement would wedge the cap after 256 total connections ever.
-func (s *Server) dropConn(conn net.Conn) {
+// decrement would wedge the cap after 256 total connections ever — and
+// reports the drop to the coordinator: control-conn drop is immediate
+// member death (DD-10, D-SL2-11). ConnClosed takes the coordinator mutex,
+// so it runs strictly after connMu is released.
+func (s *Server) dropConn(conn net.Conn, connID uint64) {
 	s.connMu.Lock()
 	delete(s.conns, conn)
 	s.connMu.Unlock()
 	conn.Close()
+	s.coord.ConnClosed(connID)
 }
 
-func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}) {
+func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}, connID uint64) {
 	defer s.wg.Done()
-	defer s.dropConn(conn)
+	defer s.dropConn(conn, connID)
 	// No read deadline while waiting for a frame: idle reclaim is SL4's,
 	// and a deadline left armed would kill parked fetches (PLAN pitfall).
 	for {
@@ -177,7 +194,7 @@ func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}) {
 			// Partial frame / clean close: just close (debug log only).
 			return
 		}
-		if !s.serveRequest(conn, typ, payload, cancel) {
+		if !s.serveRequest(conn, typ, payload, cancel, connID) {
 			return
 		}
 	}
@@ -186,14 +203,14 @@ func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}) {
 // serveRequest handles one framed request end-to-end; false means drop the
 // connection. The inflight window spans dispatch AND response write so a
 // graceful stop never closes a conn under a response in transit.
-func (s *Server) serveRequest(conn net.Conn, typ byte, payload []byte, cancel <-chan struct{}) bool {
+func (s *Server) serveRequest(conn net.Conn, typ byte, payload []byte, cancel <-chan struct{}, connID uint64) bool {
 	s.inflight.Add(1)
 	defer s.inflight.Add(-1)
 
 	if s.draining.Load() {
 		return s.writeError(conn, wire.Errf(wire.CodeShuttingDown, "broker is shutting down"))
 	}
-	respType, respBody, werr, closeAfter := s.dispatch(typ, payload, cancel)
+	respType, respBody, werr, closeAfter := s.dispatch(typ, payload, cancel, connID)
 	if werr != nil {
 		if !s.writeError(conn, werr) {
 			return false

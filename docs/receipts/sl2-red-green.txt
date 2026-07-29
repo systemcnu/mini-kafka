@@ -228,3 +228,45 @@ $ go test ./internal/broker/ -count=1 -run "TestFetchCapRejections|TestCreateTop
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/broker	0.339s
 
+=== internal/broker/group_test.go (extended, step-5 half: fencing suite) — RED (natural: group handlers not implemented — types 9+ are unknown) — Wed Jul 29 11:36:41 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run "TestGroup|TestStaleGeneration|TestUnknownMember|TestHeartbeatExempt|TestParkedGroupFetch|TestConnClose"
+# github.com/systemcnu/mini-kafka/internal/broker [github.com/systemcnu/mini-kafka/internal/broker.test]
+internal/broker/group_test.go:348:8: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:368:77: undefined: wire.CodeStaleGeneration
+internal/broker/group_test.go:370:90: undefined: wire.CodeStaleGeneration
+internal/broker/group_test.go:394:95: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:396:84: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:399:64: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:406:88: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:408:75: undefined: wire.CodeUnknownMember
+internal/broker/group_test.go:474:43: undefined: wire.CodeStaleGeneration
+FAIL	github.com/systemcnu/mini-kafka/internal/broker [build failed]
+FAIL
+
+=== (same suite after adding codes 12/13 — still RED at runtime: broker treats type 9 as unknown) — Wed Jul 29 11:36:57 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run "TestGroupJoinFetchCommitLeaveRoundtrip|TestHeartbeatExempt"
+--- FAIL: TestGroupJoinFetchCommitLeaveRoundtrip (0.19s)
+    group_test.go:294: join response type 255, body 0007000e756e6b6e6f776e20747970652039
+--- FAIL: TestHeartbeatExemptFromGenerationFence (0.08s)
+    group_test.go:418: join response type 255, body 0007000e756e6b6e6f776e20747970652039
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	0.556s
+FAIL
+
+=== internal/broker/group_test.go (fencing suite) — GREEN under -race — Wed Jul 29 11:38:52 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run "TestGroup|TestStaleGeneration|TestUnknownMember|TestHeartbeatExempt|TestParkedGroupFetch|TestConnClose|TestMultiEntry" -v
+--- PASS: TestMultiEntryFetchServesAcrossPartitions (0.15s)
+--- PASS: TestMultiEntryFetchWakesOnAnyPartitionNotRawAppend (0.21s)
+--- PASS: TestMultiEntryEmptyShapeOneGroupPerEntry (0.11s)
+--- PASS: TestGroupJoinFetchCommitLeaveRoundtrip (0.21s)
+--- PASS: TestStaleGenerationFetchAndCommitRejected (0.17s)
+--- PASS: TestUnknownMemberAlwaysGets13 (0.07s)
+--- PASS: TestHeartbeatExemptFromGenerationFence (0.08s)
+--- PASS: TestParkedGroupFetchRefencedOnWake (0.11s)
+--- PASS: TestGroupJoinValidation (0.12s)
+--- PASS: TestGroupFetchCaps (0.07s)
+--- PASS: TestConnCloseTriggersImmediateRebalance (0.15s)
+--- PASS: TestMultiEntryBudgetIsRequestOrder (0.19s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	2.902s
+

@@ -6,20 +6,22 @@ import "fmt"
 // Code is a stable protocol error code carried in Error frames.
 type Code uint16
 
-// Pinned code values (D-SL0-8). SL2 adds 12 STALE_GENERATION and
-// 13 UNKNOWN_MEMBER; nothing here may be renumbered.
+// Pinned code values (D-SL0-8); 12/13 activated by SL2 (D-SL2-1). Nothing
+// here may be renumbered.
 const (
-	CodeUnknownTopic  Code = 1
-	CodeTopicExists   Code = 2
-	CodeBadPartition  Code = 3
-	CodeInvalidName   Code = 4
-	CodeMsgTooLarge   Code = 5
-	CodeFrameTooLarge Code = 6
-	CodeMalformed     Code = 7
-	CodeCapExceeded   Code = 8
-	CodeFetchTooWide  Code = 9
-	CodeShuttingDown  Code = 10
-	CodeWriteFailed   Code = 11
+	CodeUnknownTopic    Code = 1
+	CodeTopicExists     Code = 2
+	CodeBadPartition    Code = 3
+	CodeInvalidName     Code = 4
+	CodeMsgTooLarge     Code = 5
+	CodeFrameTooLarge   Code = 6
+	CodeMalformed       Code = 7
+	CodeCapExceeded     Code = 8
+	CodeFetchTooWide    Code = 9
+	CodeShuttingDown    Code = 10
+	CodeWriteFailed     Code = 11
+	CodeStaleGeneration Code = 12
+	CodeUnknownMember   Code = 13
 )
 
 // Error is a protocol error; it crosses the wire as message type 255.
