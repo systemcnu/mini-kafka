@@ -58,6 +58,8 @@ CARDS = [
                 ("client/client.go", "JoinGroup", "func"),
                 ("client/client.go", "Poll", "method"),
                 ("client/client.go", "Commit", "method"),
+                ("client/client.go", "Assignment", "method"),
+                ("client/client.go", "Abandon", "method"),
             ]),
             ("admin", [
                 ("client/client.go", "Admin", "type"),
@@ -226,6 +228,22 @@ CARDS = [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultSyncer", "type"),
+            ]),
+        ],
+    },
+    {
+        "id": "demo", "nick": "the showpiece", "icon": "\U0001f3ac", "tint": "cmd",
+        "file": "cmd/demo/main.go · scripts/demo_timing.sh", "col": 2, "row": 3,
+        "purpose": "The visitor's two-act demo (flow, then a narrated kill + takeover) and the external clock that gates it at 60 s/180 s in CI.",
+        "groups": [
+            ("the demo", [
+                ("cmd/demo/main.go", "main", "func"),
+                ("cmd/demo/main.go", "cmd/demo/main.go", "file"),
+                ("cmd/demo/demo_test.go", "cmd/demo/demo_test.go", "file"),
+            ]),
+            ("the external clock", [
+                ("scripts/demo_timing.sh", "scripts/demo_timing.sh", "file"),
+                ("scripts/demo_timing_test.sh", "scripts/demo_timing_test.sh", "file"),
             ]),
         ],
     },

@@ -1,0 +1,49 @@
+[   6s] mini-kafka demo — one broker, one producer, two group consumers, real TCP
+[   6s] 
+[   6s] — act one —
+[   6s] broker up (in-process, loopback, temp data dir)
+[   6s] created topic demo (4 partitions)
+[   6s] consumer-1 owns partitions 0,1,2,3
+[   6s] consumer-2 owns partitions 2,3
+[   6s] consumer-1 owns partitions 0,1
+[   6s] producing msg-<n> at ~20 msg/s across all 4 partitions
+[   6s] #event first-flow
+[   8s] consumer-1: partition 0 first record msg-0 (offset 0)
+[   8s] consumer-1: partition 1 first record msg-1 (offset 0)
+[   8s] consumer-2: partition 2 first record msg-2 (offset 0)
+[   8s] consumer-2: partition 3 first record msg-3 (offset 0)
+[   8s] consumer-1: +10 records (total 10) on partitions 0,1
+[   8s] consumer-2: +10 records (total 10) on partitions 2,3
+[   9s] consumer-1: +10 records (total 20) on partitions 0,1
+[   9s] consumer-2: +10 records (total 20) on partitions 2,3
+[  10s] consumer-1: +10 records (total 30) on partitions 0,1
+[  10s] consumer-2: +10 records (total 30) on partitions 2,3
+[  11s] consumer-1: +10 records (total 40) on partitions 0,1
+[  11s] consumer-2: +10 records (total 40) on partitions 2,3
+[  12s] consumer-1: +10 records (total 50) on partitions 0,1
+[  12s] consumer-2: +10 records (total 50) on partitions 2,3
+[  12s] 
+[  12s] — act two —
+[  12s] killing consumer-2: dropping its connections mid-flight, no goodbye
+[  13s] consumer-1 owns partitions 0,1,2,3
+[  13s] consumer-1 resumes partitions 2,3 from consumer-2's last committed offsets
+[  14s] consumer-1: +20 records (total 70) on partitions 0,1,2,3
+[  15s] consumer-1: +20 records (total 90) on partitions 0,1,2,3
+[  16s] consumer-1: +20 records (total 110) on partitions 0,1,2,3
+[  17s] consumer-1: +20 records (total 130) on partitions 0,1,2,3
+[  18s] consumer-1: +20 records (total 150) on partitions 0,1,2,3
+[  18s] 
+[  18s] demo complete: two acts, one takeover, nothing lost
+[  18s] #event done
+
+== demo-timing receipt (DD-21 / D-SL3-4) ==
+commit:      bb63ce8f257958ada258979b959b0712f684e1c7
+date-utc:    2026-07-29T18:54:49Z
+go:          go version go1.24.13 linux/amd64
+os:          Linux 6.17.0-1020-azure x86_64 · Debian GNU/Linux 13 (trixie)
+image:       golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+hang-guard:  timeout -k 10 200 (GNU coreutils)
+first-flow:  6s (gate 60s)
+total:       18s (gate 180s)
+markers:     pinned order verified (act one · ownership x2 · first-flow · act two · takeover · done)
+result:      PASS
