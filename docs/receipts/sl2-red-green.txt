@@ -180,3 +180,51 @@ $ go test ./internal/group/ -race -count=1 -v
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/group	2.453s
 
+=== internal/broker/group_test.go (NEW, step-4 half: multi-entry loop) — RED (natural: entries>1 still guarded by CAP_EXCEEDED, loop not implemented) — Wed Jul 29 11:32:54 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestMultiEntry
+--- FAIL: TestMultiEntryFetchServesAcrossPartitions (0.15s)
+    group_test.go:102: multi-entry fetch response type 255, body 000800256d756c74692d656e747279206665746368206172726976657320776974682067726f757073 — want FetchResp
+--- FAIL: TestMultiEntryFetchWakesOnAnyPartitionNotRawAppend (2.10s)
+    group_test.go:150: timed out waiting for both entries to park
+--- FAIL: TestMultiEntryEmptyShapeOneGroupPerEntry (0.11s)
+    group_test.go:219: multi-entry fetch response type 255, body 000800256d756c74692d656e747279206665746368206172726976657320776974682067726f757073 — want FetchResp
+--- FAIL: TestMultiEntryBudgetIsRequestOrder (0.18s)
+    group_test.go:250: multi-entry fetch response type 255, body 000800256d756c74692d656e747279206665746368206172726976657320776974682067726f757073 — want FetchResp
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	2.821s
+FAIL
+
+=== internal/broker/group_test.go (step-4 half) — GREEN under -race — Wed Jul 29 11:33:33 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run TestMultiEntry -v
+=== RUN   TestMultiEntryFetchServesAcrossPartitions
+--- PASS: TestMultiEntryFetchServesAcrossPartitions (0.17s)
+=== RUN   TestMultiEntryFetchWakesOnAnyPartitionNotRawAppend
+--- PASS: TestMultiEntryFetchWakesOnAnyPartitionNotRawAppend (0.21s)
+=== RUN   TestMultiEntryEmptyShapeOneGroupPerEntry
+--- PASS: TestMultiEntryEmptyShapeOneGroupPerEntry (0.11s)
+=== RUN   TestMultiEntryBudgetIsRequestOrder
+--- PASS: TestMultiEntryBudgetIsRequestOrder (0.19s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	1.999s
+
+=== internal/broker/caps_test.go — RED (expected: the G7 entries>1 CAP_EXCEEDED row is now lifted by design — this red receipts the known behavior change before the row is edited) — Wed Jul 29 11:33:43 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestFetchCapRejections
+--- FAIL: TestFetchCapRejections (0.05s)
+    caps_test.go:81: response type 4, want Error frame
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	0.284s
+FAIL
+
+=== internal/broker/caps_test.go (row edited knowingly: entries>1 now asserts the lift; >16 FETCH_TOO_WIDE and all other caps unchanged) — GREEN — Wed Jul 29 11:34:00 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run "TestFetchCapRejections|TestCreateTopicCapRejections|TestOversized" -v
+=== RUN   TestOversizedFrameRejectedThenClosed
+--- PASS: TestOversizedFrameRejectedThenClosed (0.00s)
+=== RUN   TestOversizedPayloadRejectedAndNothingWritten
+--- PASS: TestOversizedPayloadRejectedAndNothingWritten (0.07s)
+=== RUN   TestFetchCapRejections
+--- PASS: TestFetchCapRejections (0.04s)
+=== RUN   TestCreateTopicCapRejections
+--- PASS: TestCreateTopicCapRejections (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	0.339s
+

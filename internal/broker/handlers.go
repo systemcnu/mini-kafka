@@ -83,11 +83,6 @@ func (s *Server) handleFetch(payload []byte, cancel <-chan struct{}) (byte, []by
 	if len(m.Entries) > MaxFetchEntries {
 		return 0, nil, wire.Errf(wire.CodeFetchTooWide, "%d entries exceeds cap %d", len(m.Entries), MaxFetchEntries), false
 	}
-	if len(m.Entries) > 1 {
-		// G7: the wire shape is final; multi-entry service arrives with
-		// groups in SL2.
-		return 0, nil, wire.Errf(wire.CodeCapExceeded, "multi-entry fetch arrives with groups"), false
-	}
 	if m.MaxWaitMs > MaxFetchWaitMs {
 		return 0, nil, wire.Errf(wire.CodeCapExceeded, "maxWaitMs %d exceeds cap %d", m.MaxWaitMs, MaxFetchWaitMs), false
 	}
@@ -102,23 +97,151 @@ func (s *Server) handleFetch(payload []byte, cancel <-chan struct{}) (byte, []by
 	if maxBytes == 0 {
 		maxBytes = DefaultFetchBytes
 	}
-	entry := m.Entries[0]
-	p, err := s.store.Partition(m.Topic, entry.Partition)
-	if err != nil {
-		return 0, nil, storageError(err), false
+	if len(m.Entries) == 1 {
+		// Raw single-entry fetch keeps its SL0 Partition.Fetch path
+		// untouched (D-SL2-7); the loop below is the n≥2 + GroupFetch path.
+		entry := m.Entries[0]
+		p, err := s.store.Partition(m.Topic, entry.Partition)
+		if err != nil {
+			return 0, nil, storageError(err), false
+		}
+		recs, err := p.Fetch(entry.Offset, maxBytes, maxWait, s.stopping, cancel)
+		if err != nil {
+			// Canceled park during conn teardown, or a read failure on durable
+			// data (which has no protocol code): drop the conn, don't invent.
+			return 0, nil, nil, true
+		}
+		group := wire.FetchGroup{Partition: entry.Partition, Recs: make([]wire.Rec, 0, len(recs))}
+		for _, r := range recs {
+			group.Recs = append(group.Recs, wire.Rec{Offset: r.Offset, Payload: r.Payload})
+		}
+		resp := wire.FetchResp{Groups: []wire.FetchGroup{group}}
+		return wire.TypeFetchResp, resp.Encode(), nil, false
 	}
-	recs, err := p.Fetch(entry.Offset, maxBytes, maxWait, s.stopping, cancel)
-	if err != nil {
-		// Canceled park during conn teardown, or a read failure on durable
-		// data (which has no protocol code): drop the conn, don't invent.
-		return 0, nil, nil, true
+	targets, werr := s.resolveTargets(m.Topic, m.Entries)
+	if werr != nil {
+		return 0, nil, werr, false
 	}
-	group := wire.FetchGroup{Partition: entry.Partition, Recs: make([]wire.Rec, 0, len(recs))}
-	for _, r := range recs {
-		group.Recs = append(group.Recs, wire.Rec{Offset: r.Offset, Payload: r.Payload})
+	return s.fetchLoop(targets, maxBytes, maxWait, cancel, nil)
+}
+
+// fetchTarget is one resolved entry of the multi-entry fetch loop.
+type fetchTarget struct {
+	partition uint32
+	offset    uint64
+	p         *storage.Partition
+}
+
+// resolveTargets validates every entry up front; any invalid partition →
+// whole-frame Error, nothing served (D-SL0-3).
+func (s *Server) resolveTargets(topic string, entries []wire.FetchEntry) ([]fetchTarget, *wire.Error) {
+	targets := make([]fetchTarget, 0, len(entries))
+	for _, e := range entries {
+		p, err := s.store.Partition(topic, e.Partition)
+		if err != nil {
+			return nil, storageError(err)
+		}
+		targets = append(targets, fetchTarget{partition: e.Partition, offset: e.Offset, p: p})
 	}
-	resp := wire.FetchResp{Groups: []wire.FetchGroup{group}}
-	return wire.TypeFetchResp, resp.Encode(), nil, false
+	return targets, nil
+}
+
+// fetchLoop is D-SL2-7's multi-partition server: TryFetch every entry with
+// maxBytes budgeted across the whole response in request order; respond if
+// ANY records; otherwise park one goroutine per entry on the captured
+// notify channels. refence, when non-nil, is GroupFetch's serve-time fence
+// (DD-12) — run before every serve attempt, including each wake.
+func (s *Server) fetchLoop(targets []fetchTarget, maxBytes uint32, maxWait time.Duration, cancel <-chan struct{}, refence func() *wire.Error) (byte, []byte, *wire.Error, bool) {
+	timer := time.NewTimer(maxWait)
+	defer timer.Stop()
+	for {
+		if refence != nil {
+			if werr := refence(); werr != nil {
+				return 0, nil, werr, false
+			}
+		}
+		groups := make([]wire.FetchGroup, 0, len(targets))
+		notifies := make([]<-chan struct{}, len(targets))
+		budget := int64(maxBytes)
+		served := false
+		for i, tgt := range targets {
+			group := wire.FetchGroup{Partition: tgt.partition, Recs: []wire.Rec{}}
+			if budget <= 0 {
+				// Spent by earlier entries (only reachable once served):
+				// this entry's legal zero-rec group, no read needed.
+				groups = append(groups, group)
+				continue
+			}
+			recs, notify, err := tgt.p.TryFetch(tgt.offset, uint32(budget))
+			if err != nil {
+				// Read failure on durable data has no protocol code: drop
+				// the conn, don't invent (same rule as single-entry).
+				return 0, nil, nil, true
+			}
+			notifies[i] = notify
+			for _, r := range recs {
+				sz := int64(12 + len(r.Payload))
+				if served && sz > budget {
+					// Min-one applies to the RESPONSE, not per entry: only
+					// the response's FIRST record may exceed the budget (so
+					// an oversized record cannot wedge a consumer); after
+					// that the budget is strict, keeping the total under
+					// the response frame cap.
+					break
+				}
+				group.Recs = append(group.Recs, wire.Rec{Offset: r.Offset, Payload: r.Payload})
+				budget -= sz
+				served = true
+			}
+			groups = append(groups, group)
+		}
+		if served {
+			return wire.TypeFetchResp, wire.FetchResp{Groups: groups}.Encode(), nil, false
+		}
+
+		// Nothing anywhere (a park round always starts with a full budget,
+		// so data can never be hidden by budgeting): park one goroutine per
+		// entry. The wake chan is buffered to len(targets) so a multi-wake
+		// round can never block a loser mid-send where close(done) cannot
+		// reach it; done is FRESH per round (reuse = double-close panic).
+		wake := make(chan struct{}, len(targets))
+		done := make(chan struct{})
+		for i, tgt := range targets {
+			unpark := tgt.p.TrackPark()
+			go func(notify <-chan struct{}) {
+				defer unpark()
+				select {
+				case <-notify:
+					wake <- struct{}{}
+				case <-done:
+				}
+			}(notifies[i])
+		}
+		// done closes on EVERY exit path of the round (D-SL2-7/F4).
+		select {
+		case <-wake:
+			close(done)
+		case <-timer.C:
+			close(done)
+			return wire.TypeFetchResp, emptyFetchShape(targets), nil, false
+		case <-s.stopping:
+			close(done)
+			return wire.TypeFetchResp, emptyFetchShape(targets), nil, false
+		case <-cancel:
+			close(done)
+			return 0, nil, nil, true
+		}
+	}
+}
+
+// emptyFetchShape is F7's pinned empty response: exactly one zero-rec
+// group per requested entry, in request order.
+func emptyFetchShape(targets []fetchTarget) []byte {
+	groups := make([]wire.FetchGroup, 0, len(targets))
+	for _, tgt := range targets {
+		groups = append(groups, wire.FetchGroup{Partition: tgt.partition, Recs: []wire.Rec{}})
+	}
+	return wire.FetchResp{Groups: groups}.Encode()
 }
 
 func (s *Server) handleCreateTopic(payload []byte) (byte, []byte, *wire.Error) {

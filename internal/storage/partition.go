@@ -223,6 +223,30 @@ func (p *Partition) readLocked(offset uint64, maxBytes uint32) ([]Record, error)
 	return out, nil
 }
 
+// TryFetch is the non-parking read for the broker's multi-entry fetch loop
+// (D-SL2-7): records at/after offset (never past the durable frontier) plus
+// the CURRENT notify channel, both captured in the SAME read-lock section —
+// the missed-wakeup pin Fetch uses. The caller parks on notify itself.
+func (p *Partition) TryFetch(offset uint64, maxBytes uint32) ([]Record, <-chan struct{}, error) {
+	p.mu.RLock()
+	recs, err := p.readLocked(offset, maxBytes)
+	notify := p.notify
+	p.mu.RUnlock()
+	if err != nil {
+		return nil, nil, err
+	}
+	return recs, notify, nil
+}
+
+// TrackPark counts an EXTERNAL parked waiter (the broker's multi-entry park
+// goroutines) in the ParkedWaiters observable; the returned func un-counts
+// it. Keeps D-SL0-5's observable truthful for parks that happen outside
+// Partition.Fetch.
+func (p *Partition) TrackPark() (unpark func()) {
+	p.parked.Add(1)
+	return func() { p.parked.Add(-1) }
+}
+
 // Frontier returns the durable byte length of the log.
 func (p *Partition) Frontier() int64 {
 	p.mu.RLock()

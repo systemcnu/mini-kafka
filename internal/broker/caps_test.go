@@ -76,9 +76,12 @@ func TestFetchCapRejections(t *testing.T) {
 	expectError(t, conn, wire.TypeFetch, fetchBody(one, MaxFetchWaitMs+1, 0), wire.CodeCapExceeded)
 	// maxBytes over cap → CAP_EXCEEDED.
 	expectError(t, conn, wire.TypeFetch, fetchBody(one, 1, MaxFetchBytes+1), wire.CodeCapExceeded)
-	// entries > 1 → CAP_EXCEEDED until groups (G7).
+	// entries 2..16 are SERVED since SL2 lifted the G7 guard (D-SL2-7) —
+	// this row asserts the lift so a regression to CAP_EXCEEDED is caught.
 	two := []wire.FetchEntry{{Partition: 0, Offset: 0}, {Partition: 0, Offset: 0}}
-	expectError(t, conn, wire.TypeFetch, fetchBody(two, 1, 0), wire.CodeCapExceeded)
+	if typ, _ := roundtrip(t, conn, wire.TypeFetch, fetchBody(two, 1, 0)); typ != wire.TypeFetchResp {
+		t.Fatalf("2-entry fetch response type %d, want FetchResp (G7 lifted)", typ)
+	}
 	// entries > 16 → FETCH_TOO_WIDE (checked before the >1 rule).
 	var many []wire.FetchEntry
 	for i := 0; i < MaxFetchEntries+1; i++ {
