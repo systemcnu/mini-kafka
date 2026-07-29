@@ -78,6 +78,13 @@ func Open(dir string, fsys FS, syncer Syncer) (*Store, error) {
 			continue
 		}
 		name := e.Name()
+		if name == "_groups" {
+			// D-SL2-4: reserved coordinator storage — commit files live
+			// there with no meta.json, and deleting it would eat every
+			// group's positions. Collision with a topic is impossible:
+			// DD-18 names must start [a-z0-9].
+			continue
+		}
 		topicDir := filepath.Join(dir, name)
 		metaBytes, err := fsys.ReadFile(filepath.Join(topicDir, "meta.json"))
 		if errors.Is(err, fs.ErrNotExist) {

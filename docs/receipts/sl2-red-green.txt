@@ -102,3 +102,81 @@ $ go test ./internal/group/ -count=1 -v
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/group	0.198s
 
+=== internal/storage/store_test.go (extended: _groups boot preservation) — RED (natural: Open's skip rule not implemented — boot deletes _groups) — Wed Jul 29 11:27:17 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run TestBootPreservesGroupsDirRemovesJunk
+--- FAIL: TestBootPreservesGroupsDirRemovesJunk (0.00s)
+    store_test.go:146: _groups commit file eaten by boot cleanup: stat /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestBootPreservesGroupsDirRemovesJunk1587435080/001/_groups/workers.json: no such file or directory
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/storage	0.272s
+FAIL
+
+=== internal/storage/store_test.go (extended) — GREEN — Wed Jul 29 11:27:28 CDT 2026 ===
+$ go test ./internal/storage/ -count=1 -run "TestBootPreservesGroupsDirRemovesJunk|TestBootRemovesTopicDirWithoutMeta" -v
+=== RUN   TestBootRemovesTopicDirWithoutMeta
+--- PASS: TestBootRemovesTopicDirWithoutMeta (0.00s)
+=== RUN   TestBootPreservesGroupsDirRemovesJunk
+--- PASS: TestBootPreservesGroupsDirRemovesJunk (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/storage	0.224s
+
+=== internal/group/commits_test.go — RED (sabotage: merge-inside-commitLock drops the snapshot of the installed map — the lost-update hole both review seats caught) — Wed Jul 29 11:29:43 CDT 2026 ===
+$ go test ./internal/group/ -race -count=1 -run TestTwoCommittersCannotEraseEachOther
+--- FAIL: TestTwoCommittersCannotEraseEachOther (1.10s)
+    commits_test.go:144: partition 0 committed = 0, want 40 (lost update)
+    commits_test.go:144: partition 1 committed = 0, want 40 (lost update)
+    commits_test.go:158: file partition 0 = 0, want 40 (file/map disagree)
+    commits_test.go:158: file partition 1 = 0, want 40 (file/map disagree)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/group	1.323s
+FAIL
+
+=== internal/group/commits_test.go — RED (sabotage: re-fence-at-install disabled — a member fenced mid-write still installs and acks) — Wed Jul 29 11:29:51 CDT 2026 ===
+$ go test ./internal/group/ -count=1 -run TestCommitFencedMidWriteInstallsNothing
+--- FAIL: TestCommitFencedMidWriteInstallsNothing (0.02s)
+    commits_test.go:202: fenced-mid-write commit err = <nil>, want ErrUnknownMember
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/group	0.240s
+FAIL
+
+=== internal/group/commits_test.go — GREEN (sabotages restored, git diff on internal/group/ empty) — Wed Jul 29 11:29:59 CDT 2026 ===
+$ go test ./internal/group/ -race -count=1 -v
+=== RUN   TestCommitPersistsAndReloadsAcrossBoot
+--- PASS: TestCommitPersistsAndReloadsAcrossBoot (0.02s)
+=== RUN   TestTwoCommittersCannotEraseEachOther
+--- PASS: TestTwoCommittersCannotEraseEachOther (1.17s)
+=== RUN   TestCommitOutsideAssignmentIsStale
+--- PASS: TestCommitOutsideAssignmentIsStale (0.00s)
+=== RUN   TestCommitFencedMidWriteInstallsNothing
+--- PASS: TestCommitFencedMidWriteInstallsNothing (0.02s)
+=== RUN   TestCorruptCommitFileRefusesJoinLoudly
+--- PASS: TestCorruptCommitFileRefusesJoinLoudly (0.00s)
+=== RUN   TestLiveGroupNeverReReadsDisk
+--- PASS: TestLiveGroupNeverReReadsDisk (0.00s)
+=== RUN   TestConcurrentFirstJoinsShareOneLoad
+--- PASS: TestConcurrentFirstJoinsShareOneLoad (0.00s)
+=== RUN   TestJoinTopicBindingComesFromDisk
+--- PASS: TestJoinTopicBindingComesFromDisk (0.00s)
+=== RUN   TestRangeAssignmentIsExactPartition
+--- PASS: TestRangeAssignmentIsExactPartition (0.00s)
+=== RUN   TestGRP2ReassignmentBoundOnFakeClock
+    coordinator_test.go:139: GRP-2 measured deadline-expiry → new-generation: 100ms (bound 1s)
+--- PASS: TestGRP2ReassignmentBoundOnFakeClock (0.00s)
+=== RUN   TestMembershipEventsBumpGenerationOnce
+--- PASS: TestMembershipEventsBumpGenerationOnce (0.00s)
+=== RUN   TestReJoinBumpsNothingAndKeepsMemberID
+--- PASS: TestReJoinBumpsNothingAndKeepsMemberID (0.00s)
+=== RUN   TestRejoinBitIsLevelTriggered
+--- PASS: TestRejoinBitIsLevelTriggered (0.00s)
+=== RUN   TestStaleMemberHeartbeatRefreshesLastBeat
+--- PASS: TestStaleMemberHeartbeatRefreshesLastBeat (0.00s)
+=== RUN   TestGroupAndMemberCaps
+--- PASS: TestGroupAndMemberCaps (0.01s)
+=== RUN   TestJoinTopicMismatchIsMalformed
+--- PASS: TestJoinTopicMismatchIsMalformed (0.00s)
+=== RUN   TestFencePrecedence13Before12
+--- PASS: TestFencePrecedence13Before12 (0.00s)
+=== RUN   TestConnClosedIsImmediateDeath
+--- PASS: TestConnClosedIsImmediateDeath (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/group	2.453s
+

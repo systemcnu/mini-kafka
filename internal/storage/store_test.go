@@ -123,6 +123,33 @@ func TestBootRemovesTopicDirWithoutMeta(t *testing.T) {
 	}
 }
 
+// TestBootPreservesGroupsDirRemovesJunk is D-SL2-4: `_groups` is reserved
+// coordinator storage with no meta.json — the aborted-create cleanup must
+// skip exactly it, or every boot would delete all group commits.
+func TestBootPreservesGroupsDirRemovesJunk(t *testing.T) {
+	dir := t.TempDir()
+	groupsDir := filepath.Join(dir, "_groups")
+	if err := os.MkdirAll(groupsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commitFile := filepath.Join(groupsDir, "workers.json")
+	if err := os.WriteFile(commitFile, []byte(`{"topic":"t","offsets":{"0":5}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	junk := filepath.Join(dir, "junkdir")
+	if err := os.MkdirAll(junk, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	openTestStore(t, dir)
+	if _, err := os.Stat(commitFile); err != nil {
+		t.Fatalf("_groups commit file eaten by boot cleanup: %v", err)
+	}
+	if _, err := os.Stat(junk); !os.IsNotExist(err) {
+		t.Fatalf("meta-less junk dir still present after boot (err=%v)", err)
+	}
+}
+
 func TestCreateTopicPartitionCountBounds(t *testing.T) {
 	s := openTestStore(t, t.TempDir())
 	for _, n := range []uint32{0, MaxPartitionsPerTopic + 1} {

@@ -104,6 +104,13 @@ type grp struct {
 	// commitMu is D-SL2-5's per-group commitLock. Lock order is pinned
 	// globally: commitMu → Coordinator.mu, NEVER the reverse.
 	commitMu sync.Mutex
+
+	// Two-phase lazy-load latch (D-SL2-5/F8): loading is closed once the
+	// creating joiner finished reading disk; loaded/loadErr are then final
+	// for the boot. Guarded by Coordinator.mu.
+	loaded  bool
+	loading chan struct{}
+	loadErr error
 }
 
 // Assigned is one partition of a join result: ownership plus the committed
@@ -195,6 +202,9 @@ func (c *Coordinator) Join(connID uint64, groupName, topic string, partitions ui
 	if g.topic != topic {
 		return JoinResult{}, fmt.Errorf("%w: group %s is bound to topic %s", ErrTopicMismatch, groupName, g.topic)
 	}
+	// The creating joiner may have claimed the wrong topic against a
+	// disk-bound group; the first CORRECT joiner fixes the partition count.
+	g.partitions = partitions
 	now := c.cfg.Clock.Now()
 	if mid, ok := c.conns[connID][groupName]; ok {
 		if m, live := g.members[mid]; live {
@@ -222,27 +232,45 @@ func (c *Coordinator) Join(connID uint64, groupName, topic string, partitions ui
 }
 
 // groupForJoin resolves (creating if needed) the group for a join,
-// enforcing the group cap. Loading of the on-disk commit state happens here
-// exactly once per group per boot (commits.go).
+// enforcing the group cap and running the once-per-boot two-phase load: the
+// creating joiner installs a loading placeholder, releases the mutex, reads
+// disk (commits.go), reinstalls; contemporaries block on the latch — never
+// on the mutex — so no I/O ever happens under it (D-SL2-5/F8, DD-25).
 func (c *Coordinator) groupForJoin(groupName, topic string, partitions uint32) (*grp, error) {
-	c.mu.Lock()
-	g, ok := c.groups[groupName]
-	if !ok {
-		if len(c.groups) >= MaxGroups {
+	for {
+		c.mu.Lock()
+		g, ok := c.groups[groupName]
+		if !ok {
+			if len(c.groups) >= MaxGroups {
+				c.mu.Unlock()
+				return nil, fmt.Errorf("%w: %d groups live", ErrTooManyGroups, MaxGroups)
+			}
+			g = &grp{
+				name:       groupName,
+				topic:      topic,
+				partitions: partitions,
+				members:    make(map[string]*member),
+				committed:  make(map[uint32]uint64),
+				loading:    make(chan struct{}),
+			}
+			c.groups[groupName] = g
 			c.mu.Unlock()
-			return nil, fmt.Errorf("%w: %d groups live", ErrTooManyGroups, MaxGroups)
+			c.loadCommits(g)
+			continue
 		}
-		g = &grp{
-			name:       groupName,
-			topic:      topic,
-			partitions: partitions,
-			members:    make(map[string]*member),
-			committed:  make(map[uint32]uint64),
+		if !g.loaded {
+			ch := g.loading
+			c.mu.Unlock()
+			<-ch
+			continue
 		}
-		c.groups[groupName] = g
+		err := g.loadErr
+		c.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		return g, nil
 	}
-	c.mu.Unlock()
-	return g, nil
 }
 
 // joinResultLocked builds the resume state for m. Caller holds c.mu.
