@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -184,9 +185,12 @@ func cmdConsume(args []string) error {
 }
 
 // consumeGroup is the SLICES demo surface: join the group, poll forever,
-// print each record, commit per batch. Records are printed BEFORE the
-// batch commits, and errors — fencing included — surface verbatim through
-// main's error path (D-SL2-8/10: no auto-heal before surfacing).
+// print each record, commit per batch. Fencing errors surface verbatim
+// (D-SL2-8/10: no auto-heal before surfacing) — but only UNKNOWN_MEMBER is
+// terminal: the member's identity is gone (SD-11's zombie). STALE_GENERATION
+// on a commit is a LIVE member racing a routine rebalance; the surfaced line
+// is printed and the loop continues — the next Poll re-joins (D-SL2-8) —
+// otherwise two members could never coexist through each other's joins.
 func consumeGroup(addr, group, topic string) error {
 	gc, err := client.JoinGroup(addr, group, topic)
 	if err != nil {
@@ -203,6 +207,11 @@ func consumeGroup(addr, group, topic string) error {
 		}
 		if len(recs) > 0 {
 			if err := gc.Commit(); err != nil {
+				var ce *client.Error
+				if errors.As(err, &ce) && ce.Code == client.CodeStaleGeneration {
+					fmt.Fprintf(os.Stderr, "mk consume: %v (rejoining)\n", err)
+					continue
+				}
 				return err
 			}
 		}

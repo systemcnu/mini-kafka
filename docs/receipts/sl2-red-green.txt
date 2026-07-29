@@ -390,3 +390,15 @@ FAIL
 
 === internal/e2e/crash_test.go — GREEN (sabotage restored) — see docs/receipts/sl2-kill9-commits.txt for the full -v run — Wed Jul 29 11:51:48 CDT 2026 ===
 
+
+=== EXIT SABOTAGE (SL2 item 8, verifier's own hands): ValidateFetch's generation fence disabled — Wed Jul 29 11:55:38 CDT 2026 ===
+--- FAIL: TestStaleGenerationFetchAndCommitRejected (0.15s)
+--- FAIL: TestParkedGroupFetchRefencedOnWake (0.11s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	1.161s
+FAIL
+=== EXIT SABOTAGE restored (git diff clean on coordinator.go) — group+broker batteries GREEN — Wed Jul 29 11:55:51 CDT 2026 ===
+ok  	github.com/systemcnu/mini-kafka/internal/group	2.127s
+ok  	github.com/systemcnu/mini-kafka/internal/broker	7.016s
+
+=== mk consume -g fencing policy fix (live-demo catch): run 2 of sl2-scenario-e.txt is the RED (member A fatally exited on a routine stale-generation commit during B's join); run 3 is the GREEN — Wed Jul 29 11:59:12 CDT 2026 ===

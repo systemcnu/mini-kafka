@@ -1,0 +1,28 @@
+=== Scenario E live (SD-11): SIGSTOP fencing on real mk consume -g processes — Wed Jul 29 11:58:47 CDT 2026 ===
+=== (third run; run 2 exposed a REAL mk defect the tests missed: fatal-exit on a routine stale-generation commit killed member A during B's join — mk now continues on 12, exits on 13) ===
+
+# built from f52b3ab
+
+$ minikafka --addr 127.0.0.1:7627 &
+created topic etest with 4 partition(s)
+$ mk create-topic -t etest -p 4   # ok
+
+$ (producer feed running: e-N round-robin over partitions 0..3)
+
+$ mk consume -t etest -g grp &   # member A (pid 101)
+$ mk consume -t etest -g grp &   # member B (pid 119)
+
+# --- pre-STOP: the two members split the 4 partitions (measured AFTER B's join settled) ---
+A owns: 0,1
+B owns: 2,3
+
+$ kill -STOP 119   # member B frozen (a stalled, not dead, process)
+# --- post-deadline: survivor A now owns ALL partitions ---
+A owns (records since STOP): 0,1,2,3
+
+$ kill -CONT 119   # B wakes, believing it is still generation-current
+# --- B's next commit is fenced (broker error 13 = UNKNOWN_MEMBER) ---
+B: mk consume: broker error 13: unknown or dead member: m2 in group grp
+B exit status: 1 (non-zero = the fenced commit was SURFACED, not healed silently)
+
+# (feed, members, broker stopped; data dir cleaned)
