@@ -194,6 +194,227 @@ func DecodeFetchResp(b []byte) (FetchResp, *Error) {
 	return m, r.done()
 }
 
+// JoinGroup is message type 9: [str group][str topic]. Joining an existing
+// group with a different topic is MALFORMED (one topic per group, D15).
+type JoinGroup struct {
+	Group string
+	Topic string
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m JoinGroup) Encode() []byte {
+	var w buf
+	w.str(m.Group)
+	w.str(m.Topic)
+	return w.b
+}
+
+// DecodeJoinGroup parses a JoinGroup body.
+func DecodeJoinGroup(b []byte) (JoinGroup, *Error) {
+	r := reader{b: b}
+	m := JoinGroup{Group: r.str(), Topic: r.str()}
+	return m, r.done()
+}
+
+// AssignedPartition is one entry of a JoinGroupResp: an owned partition and
+// the committed next-to-read offset the member resumes from (DD-14).
+type AssignedPartition struct {
+	Partition  uint32
+	NextOffset uint64
+}
+
+// JoinGroupResp is message type 10:
+// [str memberID][u64 generation][u32 n]{[u32 partition][u64 nextOffset]} —
+// join carries the whole resume state, no separate offset-fetch round.
+type JoinGroupResp struct {
+	MemberID   string
+	Generation uint64
+	Assigned   []AssignedPartition
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m JoinGroupResp) Encode() []byte {
+	var w buf
+	w.str(m.MemberID)
+	w.u64(m.Generation)
+	w.u32(uint32(len(m.Assigned)))
+	for _, a := range m.Assigned {
+		w.u32(a.Partition)
+		w.u64(a.NextOffset)
+	}
+	return w.b
+}
+
+// DecodeJoinGroupResp parses a JoinGroupResp body.
+func DecodeJoinGroupResp(b []byte) (JoinGroupResp, *Error) {
+	r := reader{b: b}
+	m := JoinGroupResp{MemberID: r.str(), Generation: r.u64()}
+	n := r.u32()
+	for i := uint32(0); i < n && r.err == nil; i++ {
+		m.Assigned = append(m.Assigned, AssignedPartition{Partition: r.u32(), NextOffset: r.u64()})
+	}
+	return m, r.done()
+}
+
+// Heartbeat is message type 11: [str group][str memberID][u64 generation].
+// Heartbeats are exempt from the generation fence (D-SL2-6): only an unknown
+// member errors one.
+type Heartbeat struct {
+	Group      string
+	MemberID   string
+	Generation uint64
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m Heartbeat) Encode() []byte {
+	var w buf
+	w.str(m.Group)
+	w.str(m.MemberID)
+	w.u64(m.Generation)
+	return w.b
+}
+
+// DecodeHeartbeat parses a Heartbeat body.
+func DecodeHeartbeat(b []byte) (Heartbeat, *Error) {
+	r := reader{b: b}
+	m := Heartbeat{Group: r.str(), MemberID: r.str(), Generation: r.u64()}
+	return m, r.done()
+}
+
+// HeartbeatRejoin is HeartbeatResp's flags bit0: set while the member's
+// joined generation trails the group's — level-triggered, never a
+// consumable flag (D-SL2-3).
+const HeartbeatRejoin uint8 = 1
+
+// HeartbeatResp is message type 12: [u8 flags] (bit0 = REJOIN).
+type HeartbeatResp struct {
+	Flags uint8
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m HeartbeatResp) Encode() []byte {
+	var w buf
+	w.u8(m.Flags)
+	return w.b
+}
+
+// DecodeHeartbeatResp parses a HeartbeatResp body.
+func DecodeHeartbeatResp(b []byte) (HeartbeatResp, *Error) {
+	r := reader{b: b}
+	m := HeartbeatResp{Flags: r.u8()}
+	return m, r.done()
+}
+
+// CommitEntry is one partition's committed position — next-to-read,
+// SPEC §1b/D13.
+type CommitEntry struct {
+	Partition uint32
+	Next      uint64
+}
+
+// CommitOffsets is message type 13:
+// [str group][str memberID][u64 generation][u32 n]{[u32 partition][u64 next]}.
+// Fenced at serve time (DD-12); the ack means the commit is durable (CONS-3).
+type CommitOffsets struct {
+	Group      string
+	MemberID   string
+	Generation uint64
+	Entries    []CommitEntry
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m CommitOffsets) Encode() []byte {
+	var w buf
+	w.str(m.Group)
+	w.str(m.MemberID)
+	w.u64(m.Generation)
+	w.u32(uint32(len(m.Entries)))
+	for _, e := range m.Entries {
+		w.u32(e.Partition)
+		w.u64(e.Next)
+	}
+	return w.b
+}
+
+// DecodeCommitOffsets parses a CommitOffsets body.
+func DecodeCommitOffsets(b []byte) (CommitOffsets, *Error) {
+	r := reader{b: b}
+	m := CommitOffsets{Group: r.str(), MemberID: r.str(), Generation: r.u64()}
+	n := r.u32()
+	for i := uint32(0); i < n && r.err == nil; i++ {
+		m.Entries = append(m.Entries, CommitEntry{Partition: r.u32(), Next: r.u64()})
+	}
+	return m, r.done()
+}
+
+// CommitOffsetsResp (type 14) and LeaveGroupResp (type 16) have empty bodies.
+
+// LeaveGroup is message type 15: [str group][str memberID].
+type LeaveGroup struct {
+	Group    string
+	MemberID string
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m LeaveGroup) Encode() []byte {
+	var w buf
+	w.str(m.Group)
+	w.str(m.MemberID)
+	return w.b
+}
+
+// DecodeLeaveGroup parses a LeaveGroup body.
+func DecodeLeaveGroup(b []byte) (LeaveGroup, *Error) {
+	r := reader{b: b}
+	m := LeaveGroup{Group: r.str(), MemberID: r.str()}
+	return m, r.done()
+}
+
+// GroupFetch is message type 17: [str group][str memberID][u64 generation]
+// plus Fetch's exact entry/maxWait/maxBytes tail
+// ([u32 nEntries]{[u32 partition][u64 offset]}[u32 maxWaitMs][u32 maxBytes]).
+// It exists because DD-12 requires group fetches to carry (memberID,
+// generation) and the shipped Fetch shape has no such fields (D-SL2-2); the
+// topic is implied by the group's binding. Answered by FetchResp (type 4,
+// reused — one decode path).
+type GroupFetch struct {
+	Group      string
+	MemberID   string
+	Generation uint64
+	Entries    []FetchEntry
+	MaxWaitMs  uint32
+	MaxBytes   uint32
+}
+
+// Encode serializes the message body (no frame envelope).
+func (m GroupFetch) Encode() []byte {
+	var w buf
+	w.str(m.Group)
+	w.str(m.MemberID)
+	w.u64(m.Generation)
+	w.u32(uint32(len(m.Entries)))
+	for _, e := range m.Entries {
+		w.u32(e.Partition)
+		w.u64(e.Offset)
+	}
+	w.u32(m.MaxWaitMs)
+	w.u32(m.MaxBytes)
+	return w.b
+}
+
+// DecodeGroupFetch parses a GroupFetch body.
+func DecodeGroupFetch(b []byte) (GroupFetch, *Error) {
+	r := reader{b: b}
+	m := GroupFetch{Group: r.str(), MemberID: r.str(), Generation: r.u64()}
+	n := r.u32()
+	for i := uint32(0); i < n && r.err == nil; i++ {
+		m.Entries = append(m.Entries, FetchEntry{Partition: r.u32(), Offset: r.u64()})
+	}
+	m.MaxWaitMs = r.u32()
+	m.MaxBytes = r.u32()
+	return m, r.done()
+}
+
 // ErrorMsg is message type 255: [u16 code][str msg].
 type ErrorMsg struct {
 	Code uint16

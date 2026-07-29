@@ -132,6 +132,181 @@ func TestFetchRespRoundtrip(t *testing.T) {
 	}
 }
 
+func TestJoinGroupRoundtrip(t *testing.T) {
+	in := JoinGroup{Group: "workers", Topic: "orders"}
+	out, err := DecodeJoinGroup(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out != in {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+}
+
+func TestJoinGroupRespRoundtrip(t *testing.T) {
+	in := JoinGroupResp{
+		MemberID:   "m3",
+		Generation: 7,
+		Assigned: []AssignedPartition{
+			{Partition: 0, NextOffset: 12},
+			{Partition: 1, NextOffset: 0},
+		},
+	}
+	out, err := DecodeJoinGroupResp(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !reflect.DeepEqual(in, out) {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+	// A member can legally own zero partitions (more members than partitions).
+	empty, err := DecodeJoinGroupResp(JoinGroupResp{MemberID: "m9", Generation: 1}.Encode())
+	if err != nil || empty.MemberID != "m9" || len(empty.Assigned) != 0 {
+		t.Fatalf("empty-assignment roundtrip = %+v, %v", empty, err)
+	}
+}
+
+func TestHeartbeatRoundtrip(t *testing.T) {
+	in := Heartbeat{Group: "workers", MemberID: "m3", Generation: 7}
+	out, err := DecodeHeartbeat(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out != in {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+}
+
+func TestHeartbeatRespRoundtrip(t *testing.T) {
+	for _, flags := range []uint8{0, HeartbeatRejoin} {
+		in := HeartbeatResp{Flags: flags}
+		out, err := DecodeHeartbeatResp(in.Encode())
+		if err != nil {
+			t.Fatalf("decode flags %d: %v", flags, err)
+		}
+		if out != in {
+			t.Fatalf("roundtrip = %+v, want %+v", out, in)
+		}
+	}
+}
+
+func TestCommitOffsetsRoundtrip(t *testing.T) {
+	in := CommitOffsets{
+		Group:      "workers",
+		MemberID:   "m3",
+		Generation: 7,
+		Entries: []CommitEntry{
+			{Partition: 0, Next: 42},
+			{Partition: 3, Next: 1},
+		},
+	}
+	out, err := DecodeCommitOffsets(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !reflect.DeepEqual(in, out) {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+}
+
+func TestLeaveGroupRoundtrip(t *testing.T) {
+	in := LeaveGroup{Group: "workers", MemberID: "m3"}
+	out, err := DecodeLeaveGroup(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out != in {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+}
+
+func TestGroupFetchRoundtrip(t *testing.T) {
+	in := GroupFetch{
+		Group:      "workers",
+		MemberID:   "m3",
+		Generation: 7,
+		Entries: []FetchEntry{
+			{Partition: 0, Offset: 5},
+			{Partition: 2, Offset: 0},
+			{Partition: 3, Offset: 99},
+		},
+		MaxWaitMs: 5000,
+		MaxBytes:  1 << 20,
+	}
+	out, err := DecodeGroupFetch(in.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !reflect.DeepEqual(in, out) {
+		t.Fatalf("roundtrip = %+v, want %+v", out, in)
+	}
+}
+
+// TestGroupDecodesRejectTruncationAndTrailingBytes runs every group message
+// type through the strict-decode gauntlet (D-SL0-3 discipline for the SL2
+// types).
+func TestGroupDecodesRejectTruncationAndTrailingBytes(t *testing.T) {
+	cases := []struct {
+		name   string
+		enc    []byte
+		decode func([]byte) *Error
+	}{
+		{"JoinGroup", JoinGroup{Group: "g", Topic: "t"}.Encode(),
+			func(b []byte) *Error { _, e := DecodeJoinGroup(b); return e }},
+		{"JoinGroupResp", JoinGroupResp{MemberID: "m1", Generation: 1, Assigned: []AssignedPartition{{Partition: 0, NextOffset: 1}}}.Encode(),
+			func(b []byte) *Error { _, e := DecodeJoinGroupResp(b); return e }},
+		{"Heartbeat", Heartbeat{Group: "g", MemberID: "m1", Generation: 1}.Encode(),
+			func(b []byte) *Error { _, e := DecodeHeartbeat(b); return e }},
+		{"HeartbeatResp", HeartbeatResp{Flags: 1}.Encode(),
+			func(b []byte) *Error { _, e := DecodeHeartbeatResp(b); return e }},
+		{"CommitOffsets", CommitOffsets{Group: "g", MemberID: "m1", Generation: 1, Entries: []CommitEntry{{Partition: 0, Next: 1}}}.Encode(),
+			func(b []byte) *Error { _, e := DecodeCommitOffsets(b); return e }},
+		{"LeaveGroup", LeaveGroup{Group: "g", MemberID: "m1"}.Encode(),
+			func(b []byte) *Error { _, e := DecodeLeaveGroup(b); return e }},
+		{"GroupFetch", GroupFetch{Group: "g", MemberID: "m1", Generation: 1, Entries: []FetchEntry{{Partition: 0, Offset: 0}}, MaxWaitMs: 1, MaxBytes: 1}.Encode(),
+			func(b []byte) *Error { _, e := DecodeGroupFetch(b); return e }},
+	}
+	for _, tc := range cases {
+		if err := tc.decode(tc.enc[:len(tc.enc)-1]); err == nil || err.Code != CodeMalformed {
+			t.Errorf("%s truncated: err = %v, want MALFORMED", tc.name, err)
+		}
+		if err := tc.decode(append(bytes.Clone(tc.enc), 0x00)); err == nil || err.Code != CodeMalformed {
+			t.Errorf("%s trailing: err = %v, want MALFORMED", tc.name, err)
+		}
+	}
+}
+
+// Hostile element counts in the counted group bodies must fail on the first
+// missing element, never drive an allocation.
+func TestGroupDecodesRejectHostileCounts(t *testing.T) {
+	// JoinGroupResp: count sits after [u16 2]"m1" + u64 generation.
+	jr := JoinGroupResp{MemberID: "m1", Generation: 1}.Encode()
+	countAt := 2 + 2 + 8
+	for i := 0; i < 4; i++ {
+		jr[countAt+i] = 0xFF
+	}
+	if _, err := DecodeJoinGroupResp(jr); err == nil || err.Code != CodeMalformed {
+		t.Errorf("JoinGroupResp hostile count: err = %v, want MALFORMED", err)
+	}
+	// CommitOffsets: count after [u16 1]"g" [u16 2]"m1" u64 generation.
+	co := CommitOffsets{Group: "g", MemberID: "m1", Generation: 1}.Encode()
+	countAt = 3 + 4 + 8
+	for i := 0; i < 4; i++ {
+		co[countAt+i] = 0xFF
+	}
+	if _, err := DecodeCommitOffsets(co); err == nil || err.Code != CodeMalformed {
+		t.Errorf("CommitOffsets hostile count: err = %v, want MALFORMED", err)
+	}
+	// GroupFetch: count after [u16 1]"g" [u16 2]"m1" u64 generation.
+	gf := GroupFetch{Group: "g", MemberID: "m1", Generation: 1, MaxWaitMs: 1, MaxBytes: 1}.Encode()
+	for i := 0; i < 4; i++ {
+		gf[countAt+i] = 0xFF
+	}
+	if _, err := DecodeGroupFetch(gf); err == nil || err.Code != CodeMalformed {
+		t.Errorf("GroupFetch hostile count: err = %v, want MALFORMED", err)
+	}
+}
+
 func TestErrorMsgRoundtrip(t *testing.T) {
 	in := ErrorMsg{Code: uint16(CodeShuttingDown), Msg: "shutting down"}
 	out, err := DecodeErrorMsg(in.Encode())

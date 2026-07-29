@@ -11,17 +11,27 @@ import (
 // Version is the only protocol version SL0 speaks.
 const Version = 1
 
-// Frame type values (D-SL0-2, pinned). Types 9+ arrive with groups in SL2.
+// Frame type values (D-SL0-2, pinned). Types 9–17 are the SL2 group
+// messages (D-SL2-1, additive only).
 const (
-	TypeProduce         byte = 1
-	TypeProduceResp     byte = 2
-	TypeFetch           byte = 3
-	TypeFetchResp       byte = 4
-	TypeCreateTopic     byte = 5
-	TypeCreateTopicResp byte = 6
-	TypeListTopics      byte = 7
-	TypeListTopicsResp  byte = 8
-	TypeError           byte = 255
+	TypeProduce           byte = 1
+	TypeProduceResp       byte = 2
+	TypeFetch             byte = 3
+	TypeFetchResp         byte = 4
+	TypeCreateTopic       byte = 5
+	TypeCreateTopicResp   byte = 6
+	TypeListTopics        byte = 7
+	TypeListTopicsResp    byte = 8
+	TypeJoinGroup         byte = 9
+	TypeJoinGroupResp     byte = 10
+	TypeHeartbeat         byte = 11
+	TypeHeartbeatResp     byte = 12
+	TypeCommitOffsets     byte = 13
+	TypeCommitOffsetsResp byte = 14
+	TypeLeaveGroup        byte = 15
+	TypeLeaveGroupResp    byte = 16
+	TypeGroupFetch        byte = 17
+	TypeError             byte = 255
 )
 
 // Frame caps (D-SL0-8): total on-the-wire frame size including the 4-byte
@@ -78,6 +88,7 @@ func ReadFrame(r io.Reader, max uint32) (typ byte, payload []byte, err error) {
 // [u32 n] blobs.
 type buf struct{ b []byte }
 
+func (w *buf) u8(v uint8)    { w.b = append(w.b, v) }
 func (w *buf) u16(v uint16)  { w.b = binary.BigEndian.AppendUint16(w.b, v) }
 func (w *buf) u32(v uint32)  { w.b = binary.BigEndian.AppendUint32(w.b, v) }
 func (w *buf) u64(v uint64)  { w.b = binary.BigEndian.AppendUint64(w.b, v) }
@@ -111,6 +122,14 @@ func (r *reader) take(n int) []byte {
 	out := r.b[r.off : r.off+n]
 	r.off += n
 	return out
+}
+
+func (r *reader) u8() uint8 {
+	b := r.take(1)
+	if b == nil {
+		return 0
+	}
+	return b[0]
 }
 
 func (r *reader) u16() uint16 {

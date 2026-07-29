@@ -1,0 +1,40 @@
+=== internal/wire/messages_test.go (extended: group types 9–17) — RED (natural: types not implemented yet) — Wed Jul 29 11:19:41 CDT 2026 ===
+$ go test ./internal/wire/ -count=1
+# github.com/systemcnu/mini-kafka/internal/wire [github.com/systemcnu/mini-kafka/internal/wire.test]
+internal/wire/messages_test.go:136:8: undefined: JoinGroup
+internal/wire/messages_test.go:137:14: undefined: DecodeJoinGroup
+internal/wire/messages_test.go:147:8: undefined: JoinGroupResp
+internal/wire/messages_test.go:150:15: undefined: AssignedPartition
+internal/wire/messages_test.go:155:14: undefined: DecodeJoinGroupResp
+internal/wire/messages_test.go:163:16: undefined: DecodeJoinGroupResp
+internal/wire/messages_test.go:163:36: undefined: JoinGroupResp
+internal/wire/messages_test.go:170:8: undefined: Heartbeat
+internal/wire/messages_test.go:171:14: undefined: DecodeHeartbeat
+internal/wire/messages_test.go:181:35: undefined: HeartbeatRejoin
+internal/wire/messages_test.go:181:35: too many errors
+FAIL	github.com/systemcnu/mini-kafka/internal/wire [build failed]
+FAIL
+
+=== internal/wire/messages_test.go (extended) — GREEN — Wed Jul 29 11:20:40 CDT 2026 ===
+$ go test ./internal/wire/ -count=1 -v -run "Group|Heartbeat|Commit|Leave"
+=== RUN   TestJoinGroupRoundtrip
+--- PASS: TestJoinGroupRoundtrip (0.00s)
+=== RUN   TestJoinGroupRespRoundtrip
+--- PASS: TestJoinGroupRespRoundtrip (0.00s)
+=== RUN   TestHeartbeatRoundtrip
+--- PASS: TestHeartbeatRoundtrip (0.00s)
+=== RUN   TestHeartbeatRespRoundtrip
+--- PASS: TestHeartbeatRespRoundtrip (0.00s)
+=== RUN   TestCommitOffsetsRoundtrip
+--- PASS: TestCommitOffsetsRoundtrip (0.00s)
+=== RUN   TestLeaveGroupRoundtrip
+--- PASS: TestLeaveGroupRoundtrip (0.00s)
+=== RUN   TestGroupFetchRoundtrip
+--- PASS: TestGroupFetchRoundtrip (0.00s)
+=== RUN   TestGroupDecodesRejectTruncationAndTrailingBytes
+--- PASS: TestGroupDecodesRejectTruncationAndTrailingBytes (0.00s)
+=== RUN   TestGroupDecodesRejectHostileCounts
+--- PASS: TestGroupDecodesRejectHostileCounts (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/wire	0.311s
+
