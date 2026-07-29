@@ -270,3 +270,49 @@ $ go test ./internal/broker/ -race -count=1 -run "TestGroup|TestStaleGeneration|
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/broker	2.902s
 
+=== client/group_test.go (NEW) — RED (natural: GroupConsumer not implemented) — Wed Jul 29 11:41:52 CDT 2026 ===
+$ go test ./client/ -count=1
+# github.com/systemcnu/mini-kafka/client_test [github.com/systemcnu/mini-kafka/client.test]
+client/group_test.go:19:40: undefined: client.GroupConsumer
+client/group_test.go:19:102: undefined: client.PartRecord
+client/group_test.go:21:19: undefined: client.PartRecord
+client/group_test.go:37:30: undefined: client.PartRecord
+client/group_test.go:76:20: undefined: client.JoinGroup
+client/group_test.go:82:53: undefined: client.PartRecord
+client/group_test.go:86:20: undefined: client.JoinGroup
+client/group_test.go:97:61: undefined: client.PartRecord
+client/group_test.go:105:53: undefined: client.PartRecord
+client/group_test.go:123:20: undefined: client.JoinGroup
+client/group_test.go:123:20: too many errors
+
+=== client/group_test.go — RED (sabotage: Poll's fenced-mid-poll rejoin-and-reissue disabled — the fence surfaces to the caller instead) — Wed Jul 29 11:43:12 CDT 2026 ===
+$ go test ./client/ -count=1 -run "TestPollRejoinsWhenFencedMidPoll|TestGroupConsumerRebalancesOnRejoinBit"
+--- FAIL: TestGroupConsumerRebalancesOnRejoinBit (0.18s)
+    group_test.go:97: Poll: broker error 12: stale generation: generation 1, current is 2
+--- FAIL: TestPollRejoinsWhenFencedMidPoll (0.32s)
+    group_test.go:156: fenced poll surfaced broker error 12: stale generation: generation 1, current is 2 — it must re-join and reissue internally
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/client	0.729s
+FAIL
+
+=== client/group_test.go — RED (sabotage: rejoin ignores the committed resume offsets — every join restarts at 0) — Wed Jul 29 11:43:21 CDT 2026 ===
+$ go test ./client/ -count=1 -run TestConsumeCommitRestartResumesExact
+--- FAIL: TestConsumeCommitRestartResumesExact (0.31s)
+    group_test.go:263: restart resumed at "h0"@0, want exactly h5@5 (the committed next-to-read)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/client	0.533s
+FAIL
+
+=== client/group_test.go — GREEN (sabotages restored, git diff on client/ empty) — Wed Jul 29 11:43:27 CDT 2026 ===
+$ go test ./client/ -race -count=1 -v
+--- PASS: TestProduceConsumeRoundtrip (0.16s)
+--- PASS: TestBrokerErrorSurfacesAsTypedCode (0.01s)
+--- PASS: TestGroupConsumerRebalancesOnRejoinBit (0.19s)
+--- PASS: TestPollRejoinsWhenFencedMidPoll (0.32s)
+--- PASS: TestCommitSurfacesFencingToCaller (0.13s)
+--- PASS: TestConsumeCommitRestartResumesExact (0.33s)
+--- PASS: TestSecondGroupGetsFullStreamFromZero (0.24s)
+--- PASS: TestControlConnSerializationUnderRace (0.90s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/client	3.489s
+
