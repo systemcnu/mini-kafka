@@ -1,15 +1,18 @@
-// kill -9 harness (D-SL1-5/6): the real broker binary SIGKILLed mid-load,
-// restarted on the same data dir, compared against the harness's ack
-// journal — LOG-1/PROD-2 half (b) by construction: real OS, real process,
-// no fakes. Assertions are one-directional: every journaled ack must be
-// fetched at its exact offset; the fetched set MAY hold more (acks the kill
-// outran, kept-but-hidden records a later flush surfaced).
+// kill -9 harness (D-SL1-5/6 + D-SL2-9): the real broker binary SIGKILLed
+// mid-load, restarted on the same data dir, compared against the harness's
+// ack journal — LOG-1/PROD-2 half (b) by construction: real OS, real
+// process, no fakes. SL2 adds a SINGLE committing group member with a
+// commit journal, closing scenario C's group-positions half (CONS-3).
+// Assertions are one-directional: every journaled ack must be fetched at
+// its exact offset (the fetched set MAY hold more), and every journaled
+// commit ack must be recovered at-or-past its value.
 package e2e
 
 import (
 	"bufio"
 	"fmt"
 	"math/rand"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -19,6 +22,7 @@ import (
 	"time"
 
 	"github.com/systemcnu/mini-kafka/client"
+	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
 const (
@@ -26,6 +30,7 @@ const (
 	partitions = 2
 	cycles     = 3
 	topic      = "crash"
+	groupName  = "harness"
 )
 
 // payloadShape is the only claim made about fetched-but-unjournaled records.
@@ -62,6 +67,107 @@ func (j *journal) snapshot(part uint32) map[uint64]string {
 	out := make(map[uint64]string, len(j.acks[part]))
 	for off, p := range j.acks[part] {
 		out[off] = p
+	}
+	return out
+}
+
+// commitJournal remembers every ACKED commit position (partition → next).
+// The ≥ recovery assertion is sound ONLY because the harness runs exactly
+// one member (D-SL2-9): with ≥2 members a live current-generation member
+// may legally commit a LOWER position after reassignment. Entries are
+// added ONLY after Commit returned nil.
+type commitJournal struct {
+	mu   sync.Mutex
+	next map[uint32]uint64
+}
+
+func newCommitJournal() *commitJournal {
+	return &commitJournal{next: make(map[uint32]uint64)}
+}
+
+func (cj *commitJournal) record(vals map[uint32]uint64) {
+	cj.mu.Lock()
+	defer cj.mu.Unlock()
+	for p, n := range vals {
+		if n > cj.next[p] {
+			cj.next[p] = n
+		}
+	}
+}
+
+func (cj *commitJournal) snapshot() map[uint32]uint64 {
+	cj.mu.Lock()
+	defer cj.mu.Unlock()
+	out := make(map[uint32]uint64, len(cj.next))
+	for p, n := range cj.next {
+		out[p] = n
+	}
+	return out
+}
+
+// runGroupConsumer is the single committing member (D-SL2-9): consume,
+// commit per batch, journal AFTER each ack. It exits when the kill reaches
+// it (any poll/commit error — the broker is gone).
+func runGroupConsumer(b *brokerProc, cj *commitJournal) {
+	gc, err := client.JoinGroup(b.addr, groupName, topic)
+	if err != nil {
+		return // the kill can outrun the join; nothing was committed
+	}
+	defer gc.Close()
+	received := make(map[uint32]uint64) // partition → next, from records actually received
+	for {
+		recs, err := gc.Poll(200 * time.Millisecond)
+		if err != nil {
+			return
+		}
+		for _, r := range recs {
+			if r.Offset+1 > received[r.Partition] {
+				received[r.Partition] = r.Offset + 1
+			}
+		}
+		if len(recs) == 0 {
+			continue
+		}
+		// Snapshot BEFORE the commit: the ack covers at least these values
+		// (Commit sends the client cursors, which are ≥ received per
+		// partition). Journaling less than was committed keeps the ≥
+		// assertion one-directional, like the produce journal.
+		snap := make(map[uint32]uint64, len(received))
+		for p, n := range received {
+			snap[p] = n
+		}
+		if err := gc.Commit(); err != nil {
+			return // unacked: never journaled
+		}
+		cj.record(snap)
+	}
+}
+
+// recoveredCommits joins the group over raw wire frames on the restarted
+// broker and returns the committed next-offsets its JoinGroupResp carries
+// (DD-14: join carries state) — the recovery evidence for CONS-3.
+func recoveredCommits(t *testing.T, addr string) map[uint32]uint64 {
+	t.Helper()
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("dial for recovery join: %v", err)
+	}
+	defer conn.Close()
+	if err := wire.WriteFrame(conn, wire.TypeJoinGroup, wire.JoinGroup{Group: groupName, Topic: topic}.Encode()); err != nil {
+		t.Fatal(err)
+	}
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	typ, body, err := wire.ReadFrame(conn, wire.MaxResponseFrame)
+	if err != nil || typ != wire.TypeJoinGroupResp {
+		t.Fatalf("recovery join: type %d, err %v", typ, err)
+	}
+	resp, werr := wire.DecodeJoinGroupResp(body)
+	if werr != nil {
+		t.Fatal(werr)
+	}
+	out := make(map[uint32]uint64, len(resp.Assigned))
+	for _, a := range resp.Assigned {
+		out[a.Partition] = a.NextOffset
 	}
 	return out
 }
@@ -148,11 +254,17 @@ func startBroker(t *testing.T, bin, dataDir string) *brokerProc {
 }
 
 // runLoadAndKill drives 4 sequenced producers round-robin over the
-// partitions, SIGKILLs the broker under load after 50–250 ms, reaps it, and
-// joins the producers. seqs persists per-producer sequence numbers across
-// cycles so every payload is unique.
-func runLoadAndKill(t *testing.T, b *brokerProc, j *journal, seqs *[producers]int) {
+// partitions plus the single committing group member (D-SL2-9), SIGKILLs
+// the broker under load after 50–250 ms, reaps it, and joins everyone.
+// seqs persists per-producer sequence numbers across cycles so every
+// payload is unique.
+func runLoadAndKill(t *testing.T, b *brokerProc, j *journal, cj *commitJournal, seqs *[producers]int) {
 	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runGroupConsumer(b, cj)
+	}()
 	for pid := 0; pid < producers; pid++ {
 		wg.Add(1)
 		go func(pid int) {
@@ -210,6 +322,7 @@ func TestKill9CrashCycles(t *testing.T) {
 	bin := buildBroker(t)
 	dataDir := t.TempDir()
 	j := newJournal()
+	cj := newCommitJournal()
 	var seqs [producers]int
 
 	for cycle := 0; cycle < cycles; cycle++ {
@@ -224,7 +337,7 @@ func TestKill9CrashCycles(t *testing.T) {
 			}
 			admin.Close()
 		}
-		runLoadAndKill(t, victim, j, &seqs)
+		runLoadAndKill(t, victim, j, cj, &seqs)
 
 		verifier := startBroker(t, bin, dataDir)
 		for part := uint32(0); part < partitions; part++ {
@@ -255,6 +368,20 @@ func TestKill9CrashCycles(t *testing.T) {
 				if _, ok := journaled[off]; !ok && !payloadShape.MatchString(got) {
 					t.Errorf("cycle %d partition %d: unjournaled record %q@%d fails the shape check", cycle, part, got, off)
 				}
+			}
+		}
+
+		// CONS-3: every journaled (acked) commit position survived the kill.
+		// One-directional and single-member (D-SL2-9): commit acked ⇒
+		// durable ⇒ recovered never lower; recovered MAY be higher (a
+		// commit the kill outran its journaling of).
+		journaledCommits := cj.snapshot()
+		recovered := recoveredCommits(t, verifier.addr)
+		t.Logf("cycle %d: group positions journaled=%v recovered=%v", cycle, journaledCommits, recovered)
+		for part, next := range journaledCommits {
+			if recovered[part] < next {
+				t.Errorf("cycle %d: partition %d recovered commit %d < journaled ack %d — an acked commit was lost",
+					cycle, part, recovered[part], next)
 			}
 		}
 

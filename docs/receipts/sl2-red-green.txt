@@ -340,3 +340,53 @@ $ cat data/_groups/cli.json   # the committed positions on disk (DD-13)
 {"topic":"smoke","offsets":{"0":2,"1":2}}
 === end mk-smoke ===
 
+=== internal/e2e/group_e2e_test.go — RED (sabotage: ConnClosed deletes the member but skips the rebalance bump — survivor never takes over) — Wed Jul 29 11:48:18 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1 -run TestGroupTakeoverOnMemberDeath
+--- FAIL: TestGroupTakeoverOnMemberDeath (21.38s)
+    group_e2e_test.go:154: survivor received from partitions map[2:true 3:true], want all 4 — takeover did not happen
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/e2e	21.601s
+FAIL
+
+=== internal/e2e/group_e2e_test.go — RED (sabotage: client rejoin skips one record past the committed position — at-least-once broken, loss visible in the union) — Wed Jul 29 11:48:49 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1 -run TestGRP3UnionAcrossMemberCrash
+--- FAIL: TestGRP3UnionAcrossMemberCrash (2.75s)
+    group_e2e_test.go:251: survivor commit: broker error 12: stale generation: generation 2, current is 3
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/e2e	3.028s
+FAIL
+
+=== internal/e2e/group_e2e_test.go — RED rerun after the test learned to tolerate legally-fenced survivor commits (sabotage: client rejoin skips one record past the committed position — loss must now be the failure) — Wed Jul 29 11:49:44 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1 -run TestGRP3UnionAcrossMemberCrash
+--- FAIL: TestGRP3UnionAcrossMemberCrash (27.85s)
+    group_e2e_test.go:274: union has 76 of 80 produced records — LOSS (e.g. [u1-1 u1-0 u1-2 u1-3])
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/e2e	28.137s
+FAIL
+
+=== internal/e2e/group_e2e_test.go — GREEN under -race (sabotages restored, git diff empty; -count=2 for stability) — Wed Jul 29 11:50:21 CDT 2026 ===
+$ go test ./internal/e2e/ -race -count=2 -run "TestGroupTakeover|TestGRP3Union" -v
+--- PASS: TestGroupTakeoverOnMemberDeath (1.08s)
+--- PASS: TestGRP3UnionAcrossMemberCrash (2.79s)
+--- PASS: TestGroupTakeoverOnMemberDeath (1.08s)
+--- PASS: TestGRP3UnionAcrossMemberCrash (2.86s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	9.127s
+
+=== internal/e2e/crash_test.go (extended: single committing member + commit journal, D-SL2-9) — RED (sabotage: commit acked without the atomicWrite — acked positions must vanish on kill -9) — Wed Jul 29 11:51:39 CDT 2026 ===
+$ go test ./internal/e2e/ -count=1 -run TestKill9CrashCycles
+    crash_test.go:346: cycle 1 partition 1: 19 journaled acks, 21 fetched records (2 unjournaled surplus)
+    crash_test.go:380: cycle 1: group positions journaled=map[0:25 1:19] recovered=map[0:0 1:0]
+    crash_test.go:383: cycle 1: partition 1 recovered commit 0 < journaled ack 19 — an acked commit was lost
+    crash_test.go:383: cycle 1: partition 0 recovered commit 0 < journaled ack 25 — an acked commit was lost
+    crash_test.go:346: cycle 2 partition 0: 34 journaled acks, 38 fetched records (4 unjournaled surplus)
+    crash_test.go:346: cycle 2 partition 1: 32 journaled acks, 34 fetched records (2 unjournaled surplus)
+    crash_test.go:380: cycle 2: group positions journaled=map[0:38 1:34] recovered=map[0:0 1:0]
+    crash_test.go:383: cycle 2: partition 1 recovered commit 0 < journaled ack 34 — an acked commit was lost
+    crash_test.go:383: cycle 2: partition 0 recovered commit 0 < journaled ack 38 — an acked commit was lost
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/e2e	1.683s
+FAIL
+
+=== internal/e2e/crash_test.go — GREEN (sabotage restored) — see docs/receipts/sl2-kill9-commits.txt for the full -v run — Wed Jul 29 11:51:48 CDT 2026 ===
+

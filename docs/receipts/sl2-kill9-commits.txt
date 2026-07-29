@@ -1,0 +1,15 @@
+=== SL2 kill -9 harness with commit journaling (D-SL2-9) — full -v run — Wed Jul 29 11:51:48 CDT 2026 ===
+$ go test ./internal/e2e/ -race -count=1 -run TestKill9CrashCycles -v
+=== RUN   TestKill9CrashCycles
+    crash_test.go:346: cycle 0 partition 0: 8 journaled acks, 8 fetched records (0 unjournaled surplus)
+    crash_test.go:346: cycle 0 partition 1: 8 journaled acks, 8 fetched records (0 unjournaled surplus)
+    crash_test.go:380: cycle 0: group positions journaled=map[0:8 1:4] recovered=map[0:8 1:8]
+    crash_test.go:346: cycle 1 partition 0: 11 journaled acks, 17 fetched records (6 unjournaled surplus)
+    crash_test.go:346: cycle 1 partition 1: 11 journaled acks, 13 fetched records (2 unjournaled surplus)
+    crash_test.go:380: cycle 1: group positions journaled=map[0:13 1:9] recovered=map[0:15 1:9]
+    crash_test.go:346: cycle 2 partition 0: 12 journaled acks, 18 fetched records (6 unjournaled surplus)
+    crash_test.go:346: cycle 2 partition 1: 16 journaled acks, 18 fetched records (2 unjournaled surplus)
+    crash_test.go:380: cycle 2: group positions journaled=map[0:18 1:18] recovered=map[0:18 1:18]
+--- PASS: TestKill9CrashCycles (1.03s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	2.274s
