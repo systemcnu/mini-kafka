@@ -1,0 +1,51 @@
+=== demo-timing, macOS local clean-cache leg (DEMO-1's approximation clause; fresh temp GOCACHE/GOMODCACHE, real caches untouched) — Wed Jul 29 13:52:04 CDT 2026 ===
+[   2s] mini-kafka demo — one broker, one producer, two group consumers, real TCP
+[   2s] 
+[   2s] — act one —
+[   2s] broker up (in-process, loopback, temp data dir)
+[   2s] created topic demo (4 partitions)
+[   2s] consumer-1 owns partitions 0,1,2,3
+[   2s] consumer-2 owns partitions 2,3
+[   2s] consumer-1 owns partitions 0,1
+[   2s] producing msg-<n> at ~20 msg/s across all 4 partitions
+[   2s] #event first-flow
+[   4s] consumer-1: partition 0 first record msg-0 (offset 0)
+[   4s] consumer-1: partition 1 first record msg-1 (offset 0)
+[   4s] consumer-2: partition 2 first record msg-2 (offset 0)
+[   4s] consumer-2: partition 3 first record msg-3 (offset 0)
+[   4s] consumer-1: +10 records (total 10) on partitions 0,1
+[   4s] consumer-2: +10 records (total 10) on partitions 2,3
+[   5s] consumer-1: +10 records (total 20) on partitions 0,1
+[   5s] consumer-2: +10 records (total 20) on partitions 2,3
+[   7s] consumer-1: +10 records (total 30) on partitions 0,1
+[   7s] consumer-2: +10 records (total 30) on partitions 2,3
+[   9s] consumer-1: +10 records (total 40) on partitions 0,1
+[   9s] consumer-2: +10 records (total 40) on partitions 2,3
+[  10s] consumer-1: +10 records (total 50) on partitions 0,1
+[  10s] consumer-2: +10 records (total 50) on partitions 2,3
+[  10s] 
+[  10s] — act two —
+[  10s] killing consumer-2: dropping its connections mid-flight, no goodbye
+[  10s] consumer-1 owns partitions 0,1,2,3
+[  10s] consumer-1 resumes partitions 2,3 from consumer-2's last committed offsets
+[  12s] consumer-1: +20 records (total 70) on partitions 0,1,2,3
+[  14s] consumer-1: +20 records (total 90) on partitions 0,1,2,3
+[  15s] consumer-1: +20 records (total 110) on partitions 0,1,2,3
+[  17s] consumer-1: +20 records (total 130) on partitions 0,1,2,3
+[  18s] consumer-1: +20 records (total 150) on partitions 0,1,2,3
+[  18s] 
+[  18s] demo complete: two acts, one takeover, nothing lost
+[  18s] #event done
+
+== demo-timing receipt (DD-21 / D-SL3-4) ==
+commit:      62a6f693df2aab1fa2fb2e43ac7fbd1a939e4c6c
+date-utc:    2026-07-29T18:52:22Z
+go:          go version go1.24.0 darwin/arm64
+os:          Darwin 25.5.0 arm64
+image:       (none — not the pinned-container run)
+hang-guard:  perl alarm+fork fallback, 200s (no timeout/gtimeout on this host)
+first-flow:  2s (gate 60s)
+total:       18s (gate 180s)
+markers:     pinned order verified (act one · ownership x2 · first-flow · act two · takeover · done)
+result:      PASS
+script exit: 0

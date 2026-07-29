@@ -136,3 +136,11 @@ total:       19s (gate 180s)
 markers:     pinned order verified (act one · ownership x2 · first-flow · act two · takeover · done)
 result:      PASS
 EXIT=0
+
+=== EXIT SABOTAGE (SL3 item 5, verifier's own hands): demo's first-flow marker broken by one character — the external gate must catch it — Wed Jul 29 13:52:57 CDT 2026 ===
+demo_timing.sh exit: 5 (expected non-zero — marker/gate failure)
+=== EXIT SABOTAGE restored (git diff clean on cmd/demo/main.go) — gate + smoke re-verified GREEN — Wed Jul 29 13:53:21 CDT 2026 ===
+total:       22s (gate 180s)
+markers:     pinned order verified (act one · ownership x2 · first-flow · act two · takeover · done)
+result:      PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	15.009s

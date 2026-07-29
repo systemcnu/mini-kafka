@@ -1,0 +1,41 @@
+=== Scenario A live: go run ./cmd/demo — the visitor's exact command (dev machine, warm cache; the COLD timing legs are the demo-timing receipts) — Wed Jul 29 13:51:39 CDT 2026 ===
+$ go run ./cmd/demo
+mini-kafka demo — one broker, one producer, two group consumers, real TCP
+
+— act one —
+broker up (in-process, loopback, temp data dir)
+created topic demo (4 partitions)
+consumer-1 owns partitions 0,1,2,3
+consumer-2 owns partitions 2,3
+consumer-1 owns partitions 0,1
+producing msg-<n> at ~20 msg/s across all 4 partitions
+#event first-flow
+consumer-1: partition 0 first record msg-0 (offset 0)
+consumer-1: partition 1 first record msg-1 (offset 0)
+consumer-2: partition 2 first record msg-2 (offset 0)
+consumer-2: partition 3 first record msg-3 (offset 0)
+consumer-1: +10 records (total 10) on partitions 0,1
+consumer-2: +10 records (total 10) on partitions 2,3
+consumer-1: +10 records (total 20) on partitions 0,1
+consumer-2: +10 records (total 20) on partitions 2,3
+consumer-1: +10 records (total 30) on partitions 0,1
+consumer-2: +10 records (total 30) on partitions 2,3
+consumer-1: +10 records (total 40) on partitions 0,1
+consumer-2: +10 records (total 40) on partitions 2,3
+consumer-1: +10 records (total 50) on partitions 0,1
+consumer-2: +10 records (total 50) on partitions 2,3
+
+— act two —
+killing consumer-2: dropping its connections mid-flight, no goodbye
+consumer-1 owns partitions 0,1,2,3
+consumer-1 resumes partitions 2,3 from consumer-2's last committed offsets
+consumer-1: +20 records (total 70) on partitions 0,1,2,3
+consumer-1: +20 records (total 90) on partitions 0,1,2,3
+consumer-1: +20 records (total 110) on partitions 0,1,2,3
+consumer-1: +20 records (total 130) on partitions 0,1,2,3
+consumer-1: +20 records (total 150) on partitions 0,1,2,3
+
+demo complete: two acts, one takeover, nothing lost
+#event done
+
+exit: 0
