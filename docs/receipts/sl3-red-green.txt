@@ -1,0 +1,138 @@
+SL3 red-before-green receipts (machine-piped; per new/extended test file).
+Convention: RED runs show the test failing against a baseline where the
+mechanism is missing (natural) or one-line-sabotaged (named, restored,
+re-verified green). For scripts/demo_timing.sh, the fake-demo red cases
+(late first-flow, late total, hang) ARE the reds, per the SL3 plan.
+Builder: SL3 steps 1-6. Commits named per section where relevant.
+
+=== client/group_test.go (extended: Assignment/Abandon, D-SL3-2) — RED (natural: methods not implemented yet) — Wed Jul 29 13:33:13 CDT 2026 ===
+$ go test ./client/ -count=1
+# github.com/systemcnu/mini-kafka/client_test [github.com/systemcnu/mini-kafka/client.test]
+client/group_test.go:316:19: c.Assignment undefined (type *client.GroupConsumer has no field or method Assignment)
+client/group_test.go:323:72: c.Assignment undefined (type *client.GroupConsumer has no field or method Assignment)
+client/group_test.go:357:15: c1.Assignment undefined (type *client.GroupConsumer has no field or method Assignment)
+client/group_test.go:368:15: c2.Assignment undefined (type *client.GroupConsumer has no field or method Assignment)
+client/group_test.go:405:5: c2.Abandon undefined (type *client.GroupConsumer has no field or method Abandon)
+client/group_test.go:417:5: c2.Abandon undefined (type *client.GroupConsumer has no field or method Abandon)
+FAIL	github.com/systemcnu/mini-kafka/client [build failed]
+FAIL
+
+=== client/group_test.go (extended) — GREEN — Wed Jul 29 13:33:32 CDT 2026 ===
+$ go test ./client/ -race -count=1 -v -run "Assignment|Abandon"
+=== RUN   TestAssignmentSnapshotAcrossRebalance
+--- PASS: TestAssignmentSnapshotAcrossRebalance (0.36s)
+=== RUN   TestAbandonKillsMemberAndSurvivorTakesOver
+--- PASS: TestAbandonKillsMemberAndSurvivorTakesOver (0.56s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/client	2.257s
+
+=== cmd/demo/demo_test.go — RED (natural: cmd/demo has no implementation yet) — Wed Jul 29 13:34:18 CDT 2026 ===
+$ go test ./cmd/demo/ -count=1
+github.com/systemcnu/mini-kafka/cmd/demo: no non-test Go files in /Users/srirondla/systems-engineering/mini-kafka/cmd/demo
+building demo binary: exit status 1
+FAIL	github.com/systemcnu/mini-kafka/cmd/demo	0.327s
+FAIL
+
+=== cmd/demo/demo_test.go — GREEN — Wed Jul 29 13:36:40 CDT 2026 ===
+$ go test ./cmd/demo/ -count=1 -v
+=== RUN   TestDemoTranscript
+--- PASS: TestDemoTranscript (17.39s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	17.836s
+
+=== cmd/demo/demo_test.go — RED (sabotage: first-flow marker text broken to '#event first_flow') — Wed Jul 29 13:37:07 CDT 2026 ===
+$ go test ./cmd/demo/ -count=1
+--- FAIL: TestDemoTranscript (14.41s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/demo	14.870s
+FAIL
+
+=== cmd/demo/demo_test.go — RED (sabotage: -ci prints an extra '(ci mode)' line — byte-identity must catch it) — Wed Jul 29 13:37:33 CDT 2026 ===
+$ go test ./cmd/demo/ -count=1
+--- FAIL: TestDemoTranscript (14.44s)
+    demo_test.go:141: default and -ci narration differ (D-SL3-3 demands byte-identical lines)
+        --- default ---
+        mini-kafka demo — one broker, one producer, two group consumers, real TCP
+
+=== cmd/demo/demo_test.go — GREEN (both sabotages restored) — Wed Jul 29 13:37:57 CDT 2026 ===
+$ go test ./cmd/demo/ -count=1 -v
+=== RUN   TestDemoTranscript
+--- PASS: TestDemoTranscript (14.34s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	14.752s
+
+=== scripts/demo_timing.sh gate tests — GREEN (all four cases; the red cases above ARE the timing script's reds) — Wed Jul 29 13:45:02 CDT 2026 ===
+$ bash scripts/demo_timing_test.sh
+-- case 1: in-window pass (first-flow ~2 s, done ~4 s)
+   ok: exit 0, first-flow=2s in [2,4)
+-- case 2: late first-flow goes red
+   ok: exit 1, breach named
+-- case 3: late total goes red
+   ok: exit 1, breach named
+-- case 4: hang goes red fast with the distinct exit
+   ok: exit 3, timed-out line present
+ALL demo_timing.sh GATE CASES GREEN
+EXIT=0
+
+=== one-off: marker-order assertion bites (fake missing act-two/takeover → distinct exit 6) — Wed Jul 29 13:44:57 CDT 2026 ===
+$ DEMO_CMD=fake_no_act2 bash scripts/demo_timing.sh
+[   0s] — act one —
+[   0s] consumer-1 owns partitions 0,1,2,3
+[   0s] consumer-2 owns partitions 2,3
+[   0s] #event first-flow
+[   0s] #event done
+RESULT: FAIL — transcript markers missing or out of order: act two header missing or before first-flow
+EXIT=6
+
+=== local run of scripts/demo_timing.sh against the REAL demo — dev-machine leg (NOT the official macOS clean-cache receipt) — Wed Jul 29 13:46:33 CDT 2026 ===
+$ bash scripts/demo_timing.sh
+[   2s] mini-kafka demo — one broker, one producer, two group consumers, real TCP
+[   2s] 
+[   2s] — act one —
+[   2s] broker up (in-process, loopback, temp data dir)
+[   2s] created topic demo (4 partitions)
+[   2s] consumer-1 owns partitions 0,1,2,3
+[   2s] consumer-2 owns partitions 2,3
+[   3s] consumer-1 owns partitions 0,1
+[   3s] producing msg-<n> at ~20 msg/s across all 4 partitions
+[   3s] #event first-flow
+[   4s] consumer-1: partition 0 first record msg-0 (offset 0)
+[   4s] consumer-1: partition 1 first record msg-1 (offset 0)
+[   4s] consumer-2: partition 2 first record msg-2 (offset 0)
+[   4s] consumer-2: partition 3 first record msg-3 (offset 0)
+[   4s] consumer-1: +10 records (total 10) on partitions 0,1
+[   4s] consumer-2: +10 records (total 10) on partitions 2,3
+[   6s] consumer-1: +10 records (total 20) on partitions 0,1
+[   6s] consumer-2: +10 records (total 20) on partitions 2,3
+[   7s] consumer-1: +10 records (total 30) on partitions 0,1
+[   7s] consumer-2: +10 records (total 30) on partitions 2,3
+[   9s] consumer-1: +10 records (total 40) on partitions 0,1
+[   9s] consumer-2: +10 records (total 40) on partitions 2,3
+[  11s] consumer-1: +10 records (total 50) on partitions 0,1
+[  11s] consumer-2: +10 records (total 50) on partitions 2,3
+[  11s] 
+[  11s] — act two —
+[  11s] killing consumer-2: dropping its connections mid-flight, no goodbye
+[  11s] consumer-1 owns partitions 0,1,2,3
+[  11s] consumer-1 resumes partitions 2,3 from consumer-2's last committed offsets
+[  13s] consumer-1: +20 records (total 70) on partitions 0,1,2,3
+[  14s] consumer-1: +20 records (total 90) on partitions 0,1,2,3
+[  16s] consumer-1: +20 records (total 110) on partitions 0,1,2,3
+[  17s] consumer-1: +20 records (total 130) on partitions 0,1,2,3
+[  19s] consumer-1: +20 records (total 150) on partitions 0,1,2,3
+[  19s] 
+[  19s] demo complete: two acts, one takeover, nothing lost
+[  19s] #event done
+
+== demo-timing receipt (DD-21 / D-SL3-4) ==
+commit:      371601734a6e6cddeed78c04b409f213730cd2f5
+date-utc:    2026-07-29T18:46:52Z
+go:          go version go1.24.0 darwin/arm64
+os:          Darwin 25.5.0 arm64
+image:       (none — not the pinned-container run)
+hang-guard:  perl alarm+fork fallback, 200s (no timeout/gtimeout on this host)
+first-flow:  3s (gate 60s)
+total:       19s (gate 180s)
+markers:     pinned order verified (act one · ownership x2 · first-flow · act two · takeover · done)
+result:      PASS
+EXIT=0
