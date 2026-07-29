@@ -43,7 +43,7 @@ CARDS = [
     {
         "id": "cli", "nick": "the courier", "icon": "\U0001f4e8", "tint": "client",
         "file": "client/client.go", "col": 2, "row": 1,
-        "purpose": "The only public package: synchronous Producer, raw Consumer, and Admin — one TCP connection each, one request in flight.",
+        "purpose": "The only public package: synchronous Producer, raw Consumer, Admin, and the dual-connection GroupConsumer — one request in flight per conn.",
         "groups": [
             ("produce", [
                 ("client/client.go", "Producer", "type"),
@@ -52,6 +52,12 @@ CARDS = [
             ("consume", [
                 ("client/client.go", "Consumer", "type"),
                 ("client/client.go", "Fetch", "method"),
+            ]),
+            ("group membership", [
+                ("client/client.go", "GroupConsumer", "type"),
+                ("client/client.go", "JoinGroup", "func"),
+                ("client/client.go", "Poll", "method"),
+                ("client/client.go", "Commit", "method"),
             ]),
             ("admin", [
                 ("client/client.go", "Admin", "type"),
@@ -95,6 +101,8 @@ CARDS = [
             ("routing", [
                 ("internal/broker/handlers.go", "dispatch", "method"),
                 ("internal/broker/handlers.go", "storageError", "func"),
+                ("internal/broker/handlers.go", "handleJoinGroup", "method"),
+                ("internal/broker/handlers.go", "handleGroupFetch", "method"),
             ]),
             ("handlers", [
                 ("internal/broker/handlers.go", "handleProduce", "method"),
@@ -207,10 +215,39 @@ CARDS = [
                 ("internal/broker/writefailed_test.go", "internal/broker/writefailed_test.go", "file"),
                 ("internal/e2e/crash_test.go", "internal/e2e/crash_test.go", "file"),
             ]),
+            ("SL2: groups (fake clock · fencing · union)", [
+                ("internal/group/coordinator_test.go", "internal/group/coordinator_test.go", "file"),
+                ("internal/group/commits_test.go", "internal/group/commits_test.go", "file"),
+                ("internal/broker/group_test.go", "internal/broker/group_test.go", "file"),
+                ("client/group_test.go", "client/group_test.go", "file"),
+                ("internal/e2e/group_e2e_test.go", "internal/e2e/group_e2e_test.go", "file"),
+            ]),
             ("fault scripting seam", [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultSyncer", "type"),
+            ]),
+        ],
+    },
+    {
+        "id": "grp", "nick": "the referee", "icon": "\U0001f9ed", "tint": "broker",
+        "file": "internal/group — coordinator.go · commits.go", "col": 4, "row": 3,
+        "purpose": "Group membership, generations, range assignment, liveness sweeping, serve-time fencing, and durable commits — one mutex, injectable clock.",
+        "groups": [
+            ("membership & liveness", [
+                ("internal/group/coordinator.go", "Coordinator", "type"),
+                ("internal/group/coordinator.go", "Join", "method"),
+                ("internal/group/coordinator.go", "Heartbeat", "method"),
+                ("internal/group/coordinator.go", "ConnClosed", "method"),
+                ("internal/group/coordinator.go", "sweepOnce", "method"),
+            ]),
+            ("fencing", [
+                ("internal/group/coordinator.go", "ValidateFetch", "method"),
+                ("internal/group/coordinator.go", "liveMemberLocked", "method"),
+            ]),
+            ("durable commits", [
+                ("internal/group/commits.go", "Commit", "method"),
+                ("internal/group/commits.go", "loadCommits", "method"),
             ]),
         ],
     },
