@@ -132,7 +132,7 @@ type Coordinator struct {
 	mu        sync.Mutex
 	groups    map[string]*grp
 	conns     map[uint64]map[string]string // connID → group → memberID
-	memberSeq uint64 // memberIDs unique per broker lifetime (DD-12 auto-fencing)
+	memberSeq uint64                       // memberIDs unique per broker lifetime (DD-12 auto-fencing)
 
 	stop        chan struct{}
 	sweeperDone chan struct{}
