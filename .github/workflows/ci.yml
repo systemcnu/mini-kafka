@@ -37,6 +37,34 @@ jobs:
           go-version: "1.24.x"
       - run: bash scripts/stdlib_audit.sh
 
+  # DD-21's external clock (D-SL3-5): fresh checkout in a container pinned
+  # BY DIGEST — the digest is a fact of this committed workflow and the
+  # receipt echoes it verbatim (satisfying DD-21's "resolved image digest"
+  # via workflow pinning, not in-container observation — G-SL3-1).
+  # Digest obtained at authoring time (2026-07-29) on a logged-in dev
+  # machine via `docker manifest inspect golang:1.24` +
+  # `docker buildx imagetools inspect golang:1.24`: this is the tag's
+  # manifest-list (OCI index) digest, which resolves linux/amd64
+  # sha256:46fdd02b6cbcd624a4087ea298e4c8505e5d400c4ee5181e4dd06e2297d647ae
+  # at pull. Refreshing the pin is a deliberate manual act (G-SL3-1).
+  demo-timing:
+    runs-on: ubuntu-latest
+    container: golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+    steps:
+      - uses: actions/checkout@v4
+      - name: demo timing gate (first-flow <= 60s, total <= 180s)
+        shell: bash
+        env:
+          DEMO_TIMING_IMAGE_REF: golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+        run: |
+          cat /etc/os-release
+          bash scripts/demo_timing.sh 2>&1 | tee demo-timing-receipt.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-timing-receipt
+          path: demo-timing-receipt.txt
+
   build-smoke:
     runs-on: macos-latest
     steps:
