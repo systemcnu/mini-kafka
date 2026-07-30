@@ -24,6 +24,20 @@ const (
 	CodeUnknownMember   Code = 13
 )
 
+// AllCodes returns every registered code, ascending. Maintained adjacent to
+// the const block above; errors_test.go parses that block from source and
+// fails if a declared constant is missing here (D-SL4-1), and the broker
+// battery elicits every entry live — so this list is the machine-readable
+// registry PROT-1's diff will consume.
+func AllCodes() []Code {
+	return []Code{
+		CodeUnknownTopic, CodeTopicExists, CodeBadPartition, CodeInvalidName,
+		CodeMsgTooLarge, CodeFrameTooLarge, CodeMalformed, CodeCapExceeded,
+		CodeFetchTooWide, CodeShuttingDown, CodeWriteFailed,
+		CodeStaleGeneration, CodeUnknownMember,
+	}
+}
+
 // Error is a protocol error; it crosses the wire as message type 255.
 type Error struct {
 	Code Code

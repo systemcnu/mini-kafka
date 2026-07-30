@@ -27,6 +27,10 @@ type Config struct {
 	Addr     string
 	DataDir  string
 	MaxConns int
+	// IdleTimeout is DD-24's idle-reclaim window (D-SL4-3): a connection
+	// with no complete request for this long is closed, silently. 0 → 5 min.
+	// A duration, not a Clock seam: net.Conn deadlines run on wall clock.
+	IdleTimeout time.Duration
 }
 
 // Server is the broker: it owns the storage.Store, the group coordinator,

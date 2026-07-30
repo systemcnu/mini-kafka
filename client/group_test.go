@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/systemcnu/mini-kafka/client"
+	"github.com/systemcnu/mini-kafka/internal/broker"
 )
 
 // pollUntil keeps polling until pred is satisfied by the accumulated
@@ -469,5 +470,81 @@ func TestControlConnSerializationUnderRace(t *testing.T) {
 		if err := <-done; err != nil {
 			t.Fatalf("concurrent commit/poll: %v", err)
 		}
+	}
+}
+
+// startIdleBroker runs a broker with a short IdleTimeout (D-SL4-3); the
+// 500 ms heartbeat cadence keeps control conns far inside the window.
+func startIdleBroker(t *testing.T, idle time.Duration) string {
+	t.Helper()
+	s, err := broker.New(broker.Config{Addr: "127.0.0.1:0", DataDir: t.TempDir(), IdleTimeout: idle})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Stop)
+	return s.Addr().String()
+}
+
+// TestPausedPollRedialsAfterIdleReclaim (D-SL4-7(4)): an app that pauses
+// Poll past the broker's IdleTimeout loses only its fetch conn — the next
+// Poll redials and serves records with no spurious hard error. Membership
+// never lapses (the heartbeat goroutine never stopped): had a member been
+// swept and re-admitted as a NEW member, the sorted-memberID range
+// assignment would have flipped the partitions between c1 and c2.
+func TestPausedPollRedialsAfterIdleReclaim(t *testing.T) {
+	addr := startIdleBroker(t, 1500*time.Millisecond)
+	admin, err := client.DialAdmin(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	if err := admin.CreateTopic("t", 2); err != nil {
+		t.Fatal(err)
+	}
+	c1, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c1.Close()
+	c2, err := client.JoinGroup(addr, "grp", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+	waitAssignment(t, c1, 10*time.Second, []uint32{0})
+	waitAssignment(t, c2, 10*time.Second, []uint32{1})
+
+	// Pause both members' Polls for two idle windows: the broker reclaims
+	// the idle fetch conns while the heartbeats keep beating.
+	time.Sleep(3 * time.Second)
+
+	prod, err := client.DialProducer(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer prod.Close()
+	mustProduceN(t, prod, "t", 0, "after-pause")
+
+	// The next Poll redials the reclaimed fetch conn and serves.
+	pollUntil(t, c1, 10*time.Second, func(got []client.PartRecord) bool {
+		return hasPayload(got, "after-pause")
+	})
+	if _, err := c2.Poll(200 * time.Millisecond); err != nil {
+		t.Fatalf("c2 poll after pause: %v", err)
+	}
+	// Membership never lapsed: assignments survive unchanged.
+	if got := c1.Assignment(); !equalParts(got, []uint32{0}) {
+		t.Fatalf("c1 assignment after pause = %v, want [0] (membership lapsed?)", got)
+	}
+	if got := c2.Assignment(); !equalParts(got, []uint32{1}) {
+		t.Fatalf("c2 assignment after pause = %v, want [1] (membership lapsed?)", got)
+	}
+	// And the healed member's commit is acked (a lapsed membership would
+	// surface 13 here — Commit never re-joins first, D-SL2-8).
+	if err := c1.Commit(); err != nil {
+		t.Fatalf("commit after redial: %v", err)
 	}
 }

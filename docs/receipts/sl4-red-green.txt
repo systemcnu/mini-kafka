@@ -1,0 +1,82 @@
+SL4 red-before-green receipts (machine-piped; per new/extended test file).
+Convention: RED runs show the test failing against the commit-1 SEAMS-ONLY
+broker (Config.IdleTimeout present but unenforced, wire.AllCodes() live,
+pre-SL4 serve/accept paths — so the conn-cap frame red IS the pre-seam
+EOF-no-frame shape), or against a named one-line sabotage (restored and
+re-verified green). Special reds mandated by DESIGN §6.1/§4: conn-cap frame
+vs pre-seam behavior; stalled-reader with the write deadline removed;
+AllCodes parser leg vs a scratch CodeProbe constant; battery vs a removed
+elicitation. Builder: SL4 rows 1-8.
+
+=== internal/broker/caps_test.go + registry_test.go (SL4 rows) — RED (natural: commit-1 seams-only broker; the conn-cap fail IS the pre-seam EOF-no-frame special red; the stalled-reader fail IS the no-write-deadline shape) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run 'TestConnectionCapGuard|TestIdleConnReclaimed|TestHeartbeatingConnSurvivesIdleWindow|TestIdleReclaimFreesCapSlots|TestParkedFetchSurvivesIdleTimeout|TestStalledReaderReclaimedByWriteDeadline|TestMemberCapRejectionServedOverWire|TestGroupCapRejectionServedOverWire|TestFetchBadPartitionRejected|TestMalformedTableOverWire|TestScenarioH' -v
+=== RUN   TestConnectionCapGuard
+    caps_test.go:157: over-cap conn: reading the served frame: EOF
+--- FAIL: TestConnectionCapGuard (0.00s)
+=== RUN   TestIdleConnReclaimed
+    caps_test.go:278: idle conn read = read tcp 127.0.0.1:64413->127.0.0.1:64412: i/o timeout, want io.EOF (reclaimed)
+--- FAIL: TestIdleConnReclaimed (3.00s)
+=== RUN   TestHeartbeatingConnSurvivesIdleWindow
+--- PASS: TestHeartbeatingConnSurvivesIdleWindow (2.11s)
+=== RUN   TestIdleReclaimFreesCapSlots
+    caps_test.go:319: timed out waiting for idle reclaim to free a cap slot
+--- FAIL: TestIdleReclaimFreesCapSlots (2.01s)
+=== RUN   TestParkedFetchSurvivesIdleTimeout
+--- PASS: TestParkedFetchSurvivesIdleTimeout (0.73s)
+=== RUN   TestStalledReaderReclaimedByWriteDeadline
+    caps_test.go:407: drained 3686466 bytes ≥ the 3686400-byte response — the stalled conn was never reclaimed
+--- FAIL: TestStalledReaderReclaimedByWriteDeadline (6.65s)
+=== RUN   TestMemberCapRejectionServedOverWire
+--- PASS: TestMemberCapRejectionServedOverWire (0.06s)
+=== RUN   TestGroupCapRejectionServedOverWire
+--- PASS: TestGroupCapRejectionServedOverWire (0.05s)
+=== RUN   TestFetchBadPartitionRejected
+--- PASS: TestFetchBadPartitionRejected (0.04s)
+=== RUN   TestMalformedTableOverWire
+--- PASS: TestMalformedTableOverWire (0.01s)
+=== RUN   TestScenarioH
+--- PASS: TestScenarioH (0.28s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	15.220s
+FAIL
+(guard/coverage rows are GREEN by design at this stage: they pin behavior that already exists — park survival, heartbeat exemption arithmetic, group caps, malformed table, bad partition, battery; their sabotage reds follow below or at their build row)
+
+=== internal/wire/errors_test.go — GREEN (parser leg over the shipped AllCodes) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/wire/ -count=1 -run TestAllCodesCoversEveryDeclaredConstant -v
+=== RUN   TestAllCodesCoversEveryDeclaredConstant
+--- PASS: TestAllCodesCoversEveryDeclaredConstant (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/wire	0.217s
+
+=== internal/wire/errors_test.go — RED (sabotage probe, PLAN row 2: scratch 'const CodeProbe Code = 14' added to errors.go, not committed) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/wire/ -count=1 -run TestAllCodesCoversEveryDeclaredConstant -v
+=== RUN   TestAllCodesCoversEveryDeclaredConstant
+    errors_test.go:70: declared constant CodeProbe = 14 is missing from AllCodes()
+--- FAIL: TestAllCodesCoversEveryDeclaredConstant (0.00s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/wire	0.252s
+FAIL
+
+=== internal/wire/errors_test.go — GREEN (probe removed) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/wire/ -count=1 -run TestAllCodesCoversEveryDeclaredConstant
+ok  	github.com/systemcnu/mini-kafka/internal/wire	0.189s
+
+=== internal/broker/registry_test.go — RED (sabotage: UNKNOWN_MEMBER elicitation removed from the battery — the union==AllCodes leg must catch a missing elicitation, D-SL4-1's standing property) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestScenarioH -v
+    registry_test.go:247: registry code 13 never elicited by the battery
+    registry_test.go:251: battery elicited 12 codes, registry has 13
+--- FAIL: TestScenarioH (0.76s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	0.979s
+FAIL
+
+=== internal/broker/registry_test.go — GREEN (elicitation restored) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestScenarioH
+ok  	github.com/systemcnu/mini-kafka/internal/broker	0.588s
+
+=== client/group_test.go (TestPausedPollRedialsAfterIdleReclaim) — GREEN at commit 1 (nothing reclaims yet; its honest natural RED is only reachable AFTER the broker's idle reclaim ships and BEFORE the client trigger does — captured at build-order row 4→5 below) — Wed Jul 29 23:10:23 CDT 2026 ===
+$ go test ./client/ -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
+=== RUN   TestPausedPollRedialsAfterIdleReclaim
+--- PASS: TestPausedPollRedialsAfterIdleReclaim (3.52s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/client	3.748s
