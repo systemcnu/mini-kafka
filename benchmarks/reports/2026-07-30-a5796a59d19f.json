@@ -1,0 +1,95 @@
+{
+  "title": "closed-loop response latency",
+  "commit": "a5796a59d19f",
+  "timestamp": "2026-07-30T15:33:03Z",
+  "hardware": "Apple M3 Max (Mac15,9), 128 GB RAM, macOS 26.5.2",
+  "os": "darwin",
+  "arch": "arm64",
+  "go_version": "go1.24.0",
+  "gomaxprocs": 16,
+  "storage": "Apple internal NVMe SSD (APFS)",
+  "fsync_mode": "fsync via Go os.File.Sync (macOS: F_FULLFSYNC, a full drive-cache barrier; Linux: fsync)",
+  "group_commit_window_ms": 5,
+  "load_model": "closed-loop, C=8 sync producers, in-flight 1/conn",
+  "message_size": 1024,
+  "partitions": 4,
+  "warmup_seconds": 2,
+  "run_seconds": 10,
+  "percentile_method": "nearest-rank on sorted samples",
+  "method_notes": [
+    "e2e latency is wall-clock, same process both ends; a clock step mid-run lands in the numbers (G-SL5-2)",
+    "the consumer commits once per iteration boundary, outside the sampled path",
+    "the warm-up bucket is measured and discarded",
+    "e2e is sampled only for records received in-window; consumer lag inflates latency honestly and shows in e2e_samples (G-SL5-3)"
+  ],
+  "iterations": [
+    {
+      "duration_seconds": 10.041820417,
+      "msgs_acked": 987,
+      "msgs_per_sec": 98.28895150615199,
+      "mb_per_sec": 0.10064788634229964,
+      "ack_p50_ms": 72.2575,
+      "ack_p99_ms": 150.635584,
+      "e2e_p50_ms": 72.314,
+      "e2e_p99_ms": 152.217,
+      "e2e_samples": 987,
+      "gc_pause_delta_ms": 117.238376,
+      "gc_count_delta": 7,
+      "produce_errors": 0,
+      "duplicates": 0
+    },
+    {
+      "duration_seconds": 10.080324541,
+      "msgs_acked": 388,
+      "msgs_per_sec": 38.49082422117227,
+      "mb_per_sec": 0.039414604002480404,
+      "ack_p50_ms": 131.13025,
+      "ack_p99_ms": 3661.892625,
+      "e2e_p50_ms": 132.866,
+      "e2e_p99_ms": 3662.766,
+      "e2e_samples": 388,
+      "gc_pause_delta_ms": 36.839332,
+      "gc_count_delta": 2,
+      "produce_errors": 0,
+      "duplicates": 0
+    },
+    {
+      "duration_seconds": 10.184117042,
+      "msgs_acked": 584,
+      "msgs_per_sec": 57.344195632428786,
+      "mb_per_sec": 0.05872045632760708,
+      "ack_p50_ms": 137.222167,
+      "ack_p99_ms": 177.411125,
+      "e2e_p50_ms": 139.445,
+      "e2e_p99_ms": 180.633,
+      "e2e_samples": 584,
+      "gc_pause_delta_ms": 59.571708,
+      "gc_count_delta": 3,
+      "produce_errors": 0,
+      "duplicates": 0
+    }
+  ],
+  "spread": {
+    "msgs_per_sec": {
+      "min": 38.49082422117227,
+      "max": 98.28895150615199,
+      "mean": 64.70799045325101
+    },
+    "ack_p99_ms": {
+      "min": 150.635584,
+      "max": 3661.892625,
+      "mean": 1329.9797780000001
+    },
+    "e2e_p99_ms": {
+      "min": 152.217,
+      "max": 3662.766,
+      "mean": 1331.872
+    }
+  },
+  "caveats": [
+    "closed-loop load understates the queueing tails an open-loop arrival process would show",
+    "ack latency includes the broker's 5 ms group-commit window",
+    "durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)",
+    "no capacity claims: fixed closed-loop response numbers, not a maximum"
+  ]
+}

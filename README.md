@@ -76,3 +76,48 @@ long-poll fetch, boot recovery, graceful stop), and editor deep-links —
 lives at [docs/code-map.html](docs/code-map.html) (open it in a browser).
 Refresh it with `python3 scripts/gen_code_map.py`; the generator re-resolves
 every source anchor and refuses to write if any is stale.
+
+<!-- bench:begin -->
+## Benchmarks — closed-loop response latency
+
+Machine-rendered from the committed report by `go run ./cmd/bench -render-readme <report>`;
+a repo test re-renders and byte-compares, so a hand-edited number is a build failure.
+
+| iteration | msgs/s | MB/s | ack p50 ms | ack p99 ms | e2e p50 ms | e2e p99 ms | e2e samples | produce errors | duplicates |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 98.3 | 0.10 | 72.26 | 150.64 | 72.31 | 152.22 | 987 | 0 | 0 |
+| 2 | 38.5 | 0.04 | 131.13 | 3661.89 | 132.87 | 3662.77 | 388 | 0 | 0 |
+| 3 | 57.3 | 0.06 | 137.22 | 177.41 | 139.44 | 180.63 | 584 | 0 | 0 |
+
+Spread across iterations (min / max / mean):
+
+- msgs/s: 38.5 / 98.3 / 64.7
+- ack p99 ms: 150.64 / 3661.89 / 1329.98
+- e2e p99 ms: 152.22 / 3662.77 / 1331.87
+
+Setup:
+
+- hardware: Apple M3 Max (Mac15,9), 128 GB RAM, macOS 26.5.2
+- OS/arch: darwin/arm64
+- Go: go1.24.0
+- GOMAXPROCS: 16
+- commit: a5796a59d19f
+- storage: Apple internal NVMe SSD (APFS)
+- fsync mode: fsync via Go os.File.Sync (macOS: F_FULLFSYNC, a full drive-cache barrier; Linux: fsync)
+- group-commit window: 5 ms
+- load model: closed-loop, C=8 sync producers, in-flight 1/conn
+- message size: 1024 bytes
+- partitions: 4
+- run: 3 iterations × 10.0 s
+- warm-up: 2.0 s (measured, discarded)
+- percentile method: nearest-rank on sorted samples
+
+Caveats:
+
+- closed-loop load understates the queueing tails an open-loop arrival process would show
+- ack latency includes the broker's 5 ms group-commit window
+- durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)
+- no capacity claims: fixed closed-loop response numbers, not a maximum
+
+Source report: `benchmarks/reports/2026-07-30-a5796a59d19f.json`
+<!-- bench:end -->

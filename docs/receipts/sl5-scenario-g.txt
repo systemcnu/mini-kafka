@@ -1,0 +1,7 @@
+SL5 scenario G — the reference benchmark run, live (Thu Jul 30 10:33:03 CDT 2026)
+Command: bench -hardware "Apple M3 Max (Mac15,9), 128 GB RAM, macOS 26.5.2" -storage "Apple internal NVMe SSD (APFS)"
+Built from clean tree at commit a5796a5; defaults: 3 iterations x 10 s, 2 s warm-up, C=8.
+Sync-cost probe on this machine (drives the fsync label): os.File.Sync p50 5.5ms == F_FULLFSYNC 6.5ms; raw fsync(2) 0.11ms.
+(First build attempt was stamped -dirty by an untracked receipt file present at build time — the D-SL5-8 gate would have rejected it; rebuilt clean.)
+
+bench: report written to benchmarks/reports/2026-07-30-a5796a59d19f.json
