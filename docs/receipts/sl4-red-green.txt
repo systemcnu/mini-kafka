@@ -122,3 +122,10 @@ $ go test ./client/ -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
 FAIL
 FAIL	github.com/systemcnu/mini-kafka/client	3.549s
 FAIL
+
+=== client/group_test.go TestPausedPollRedialsAfterIdleReclaim — GREEN (row 5: EOF/reset added to the existing redial trigger; membership proven unlapsed via assignment stability + acked commit) — Wed Jul 29 23:13:19 CDT 2026 ===
+$ go test ./client/ -race -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
+=== RUN   TestPausedPollRedialsAfterIdleReclaim
+--- PASS: TestPausedPollRedialsAfterIdleReclaim (3.53s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/client	4.828s

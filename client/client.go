@@ -8,9 +8,11 @@ package client
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/systemcnu/mini-kafka/internal/wire"
@@ -95,6 +97,10 @@ func (cn *conn) close() error { return cn.c.Close() }
 
 // Producer produces synchronously: each Produce blocks until the broker's
 // durable ack and returns the assigned offset.
+//
+// A Producer does NOT auto-reconnect: the broker reclaims a connection idle
+// past its IdleTimeout (default 5 min, G-SL4-1), and the next Produce then
+// surfaces an EOF/reset error — redial to continue.
 type Producer struct {
 	cn *conn
 }
@@ -127,6 +133,10 @@ func (p *Producer) Produce(topic string, partition uint32, payload []byte) (uint
 func (p *Producer) Close() error { return p.cn.close() }
 
 // Consumer is a raw single-partition fetch loop over one connection.
+//
+// A Consumer does NOT auto-reconnect: the broker reclaims a connection idle
+// past its IdleTimeout (default 5 min, G-SL4-1), and the next Fetch then
+// surfaces an EOF/reset error — redial to continue.
 type Consumer struct {
 	cn *conn
 }
@@ -400,9 +410,15 @@ func (g *GroupConsumer) Poll(maxWait time.Duration) ([]PartRecord, error) {
 				continue
 			}
 			var nerr net.Error
-			if errors.As(err, &nerr) && nerr.Timeout() {
-				// Read-deadline expiry is conn-fatal: redial + rejoin +
-				// reissue (D-SL2-8).
+			if (errors.As(err, &nerr) && nerr.Timeout()) ||
+				errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+				errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
+				// Read-deadline expiry is conn-fatal (D-SL2-8); EOF/reset is
+				// the broker's idle reclaim taking the fetch conn of a
+				// paused Poll (D-SL4-7(4)) — either way the same machinery:
+				// redial + rejoin + reissue. Membership is untouched (the
+				// heartbeat goroutine never stopped), so the re-join is the
+				// live member's own (D-SL2-3b), never a spurious hard error.
 				g.fetchConn.close()
 				fc, derr := dial(g.addr)
 				if derr != nil {
