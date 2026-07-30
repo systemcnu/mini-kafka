@@ -21,6 +21,23 @@ const (
 	percentileMethodLabel = "nearest-rank on sorted samples"
 )
 
+// The caveats block (D-SL5-2): closed-loop tails, the batching window,
+// the fsync platform limit, no capacity claims.
+var reportCaveats = []string{
+	"closed-loop load understates the queueing tails an open-loop arrival process would show",
+	"ack latency includes the broker's 5 ms group-commit window",
+	"fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)",
+	"no capacity claims: fixed closed-loop response numbers, not a maximum",
+}
+
+// The method note (D-SL5-1's stated measurement choices).
+var reportMethodNotes = []string{
+	"e2e latency is wall-clock, same process both ends; a clock step mid-run lands in the numbers (G-SL5-2)",
+	"the consumer commits once per iteration boundary, outside the sampled path",
+	"the warm-up bucket is measured and discarded",
+	"e2e is sampled only for records received in-window; consumer lag inflates latency honestly and shows in e2e_samples (G-SL5-3)",
+}
+
 // Report is one benchmark run's machine-written record. Every honesty
 // label BENCH-2 demands lives here (D-SL5-2); nothing is added at render
 // time. Zero-legal counters (errors, duplicates, GC deltas) carry no
@@ -172,6 +189,8 @@ func buildReport(cfg benchConfig, commit string, now time.Time, stats []*produce
 		WarmupSeconds:       cfg.warmup.Seconds(),
 		RunSeconds:          cfg.duration.Seconds(),
 		PercentileMethod:    percentileMethodLabel,
+		MethodNotes:         reportMethodNotes,
+		Caveats:             reportCaveats,
 		Iterations:          rows,
 		Spread: Spread{
 			MsgsPerSec: minMaxMean(rates),
