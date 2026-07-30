@@ -4,7 +4,10 @@
 // broker for the 11 non-terminal codes · WRITE_FAILED on a dedicated FaultFS
 // broker with the fault scoped to the target topic's own log (F4) ·
 // SHUTTING_DOWN last, on a throwaway broker under a concurrent-Stop hammer
-// (≥1 code-10 frame before EOF — the drain window races conn force-close).
+// (≥1 code-10 frame before EOF). The drain window is SCRIPTED open through
+// the Syncer seam (a slow fsync keeps an ack pending, so Drain must wait) —
+// racing the natural window loses under machine load: the serialized hammer
+// missed 20/20 attempts in a loaded full-suite run.
 //
 // Cap inventory audit table (NFR-2's check, DD-16: 12 input caps + the
 // structural in-flight row, G-SL4-2). Cap → enforcing code path → rejection
@@ -186,14 +189,21 @@ func TestScenarioH(t *testing.T) {
 	serving(fconn, "WRITE_FAILED")
 
 	// --- Instance 3: throwaway broker(s) — the SHUTTING_DOWN Stop-hammer ---
-	// The drain window races conn force-close (F2): assert ≥1 code-10 frame,
-	// never exactly-once, never frame-then-clean-close. The hammer PRODUCES
-	// (fsync-coupled acks occupy the window; a ListTopics hammer can miss it
-	// entirely), and because the window can still close on zero requests, the
-	// whole elicitation retries on a fresh throwaway broker — bounded, loud
-	// on total failure, never a silent flake.
+	// Assert ≥1 code-10 frame, never exactly-once, never frame-then-clean-
+	// close (F2: the window's edges race conn force-close). The window itself
+	// is scripted, not raced: a slow Syncer makes every produce ack's fsync
+	// take ~200 ms, so the hammer's in-flight produce holds store.Drain open
+	// while draining=true. A single conn cannot COLLECT inside that window —
+	// its serve loop is blocked in the produce's dispatch, and after the ack
+	// the force-close race is lost under load — so a SECOND conn does the
+	// collecting: A parks the slow produce, B hammers cheap requests. If the
+	// initial race instead flips draining before A's produce is dispatched,
+	// A's own response IS the code-10 — both frames count, so one of the two
+	// conns must see it. Retries on fresh brokers stay as a bounded, loud
+	// belt-and-braces, never a silent flake.
 	elicit10 := func(attempt int) int {
-		hs, err := New(Config{Addr: "127.0.0.1:0", DataDir: t.TempDir()})
+		hs, err := newWithFS(Config{Addr: "127.0.0.1:0", DataDir: t.TempDir()},
+			storage.OSFS(), slowSyncer{200 * time.Millisecond})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,34 +211,53 @@ func TestScenarioH(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(hs.Stop) // idempotent; joins the concurrent Stop below
-		hconn, err := net.Dial("tcp", hs.Addr().String())
+		connA, err := net.Dial("tcp", hs.Addr().String())
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { hconn.Close() })
-		mustCreateTopic(t, hconn, "hammer", 1)
-		mustProduce(t, hconn, "hammer", 0, "pre-stop") // live service confirmed
+		t.Cleanup(func() { connA.Close() })
+		connB, err := net.Dial("tcp", hs.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { connB.Close() })
+		mustCreateTopic(t, connA, "hammer", 1)
+		mustProduce(t, connA, "hammer", 0, "pre-stop") // live service confirmed
+
+		// A parks the drain-occupying produce (response read AFTER the run);
+		// only then does Stop start, so the window opens behind a real ack.
+		slowBody := wire.Produce{Topic: "hammer", Partition: 0, Payload: []byte("occupier")}.Encode()
+		if err := wire.WriteFrame(connA, wire.TypeProduce, slowBody); err != nil {
+			t.Fatal(err)
+		}
 		stopped := make(chan struct{})
 		go func() {
 			hs.Stop()
 			close(stopped)
 		}()
 		saw := 0
-		hammerBody := wire.Produce{Topic: "hammer", Partition: 0, Payload: make([]byte, 32<<10)}.Encode()
-		hconn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		count := func(typ byte, body []byte) {
+			if typ != wire.TypeError {
+				return
+			}
+			if em, werr := wire.DecodeErrorMsg(body); werr == nil && em.Code == uint16(wire.CodeShuttingDown) {
+				saw++
+			}
+		}
+		connB.SetReadDeadline(time.Now().Add(15 * time.Second))
 		for {
-			if err := wire.WriteFrame(hconn, wire.TypeProduce, hammerBody); err != nil {
+			if err := wire.WriteFrame(connB, wire.TypeListTopics, nil); err != nil {
 				break
 			}
-			typ, body, err := wire.ReadFrame(hconn, wire.MaxResponseFrame)
+			typ, body, err := wire.ReadFrame(connB, wire.MaxResponseFrame)
 			if err != nil {
 				break // EOF/reset: the force-close landed
 			}
-			if typ == wire.TypeError {
-				if em, werr := wire.DecodeErrorMsg(body); werr == nil && em.Code == uint16(wire.CodeShuttingDown) {
-					saw++
-				}
-			}
+			count(typ, body)
+		}
+		connA.SetReadDeadline(time.Now().Add(15 * time.Second))
+		if typ, body, err := wire.ReadFrame(connA, wire.MaxResponseFrame); err == nil {
+			count(typ, body) // A's produce: ack (case i) or the code-10 itself (case ii)
 		}
 		<-stopped
 		t.Logf("stop-hammer attempt %d: %d code-10 frame(s) before EOF", attempt, saw)
@@ -253,4 +282,13 @@ func TestScenarioH(t *testing.T) {
 	if len(elicited) != len(all) {
 		t.Errorf("battery elicited %d codes, registry has %d", len(elicited), len(all))
 	}
+}
+
+// slowSyncer scripts the Stop-drain window open: each ack's fsync sleeps
+// before syncing, so a pending produce occupies store.Drain for its duration.
+type slowSyncer struct{ d time.Duration }
+
+func (s slowSyncer) Sync(f storage.File) error {
+	time.Sleep(s.d)
+	return f.Sync()
 }
