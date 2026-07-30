@@ -129,3 +129,48 @@ $ go test ./client/ -race -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
 --- PASS: TestPausedPollRedialsAfterIdleReclaim (3.53s)
 PASS
 ok  	github.com/systemcnu/mini-kafka/client	4.828s
+
+=== rows 6-7: malformed table, group caps, fetch bad-partition, TestScenarioH — GREEN under -race against the full implementation — Wed Jul 29 23:15:23 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run 'TestMalformedTableOverWire|TestMemberCapRejectionServedOverWire|TestGroupCapRejectionServedOverWire|TestFetchBadPartitionRejected|TestScenarioH' -v
+=== RUN   TestMemberCapRejectionServedOverWire
+--- PASS: TestMemberCapRejectionServedOverWire (0.07s)
+=== RUN   TestGroupCapRejectionServedOverWire
+--- PASS: TestGroupCapRejectionServedOverWire (0.05s)
+=== RUN   TestFetchBadPartitionRejected
+--- PASS: TestFetchBadPartitionRejected (0.05s)
+=== RUN   TestMalformedTableOverWire
+--- PASS: TestMalformedTableOverWire (0.01s)
+=== RUN   TestScenarioH
+--- PASS: TestScenarioH (1.42s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	2.849s
+
+=== row 8: full suite — GREEN — Wed Jul 29 23:15:23 CDT 2026 ===
+$ go test -race ./...
+ok  	github.com/systemcnu/mini-kafka/client	13.789s
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	23.936s
+?   	github.com/systemcnu/mini-kafka/cmd/minikafka	[no test files]
+?   	github.com/systemcnu/mini-kafka/cmd/mk	[no test files]
+ok  	github.com/systemcnu/mini-kafka/internal/broker	24.549s
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	15.637s
+ok  	github.com/systemcnu/mini-kafka/internal/group	6.408s
+ok  	github.com/systemcnu/mini-kafka/internal/storage	16.014s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	2.314s
+ok  	github.com/systemcnu/mini-kafka/internal/wire	2.084s
+
+$ bash scripts/checks.sh
+== build
+== vet
+== staticcheck (pinned, same as CI)
+== gofmt check
+== stdlib audit
+== test
+== linux cross-build (local Linux proxy)
+ALL CHECKS GREEN
+
+$ go test -race ./... -v 2>&1 | grep -c -- '--- PASS'
+143
+
+Audit-table cap-row count by command (no hand-typed numbers):
+$ awk '/Cap inventory audit table/,/package broker/' internal/broker/registry_test.go | grep -cE '^//	(1[0-2]| [1-9]) '
+12
