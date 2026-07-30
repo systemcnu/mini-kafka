@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 )
 
@@ -46,16 +47,29 @@ func main() {
 		return // SKELETON: the renderer lands at its build row (D-SL5-4)
 	}
 
-	// SKELETON (PLAN row 1): flags + report shape only — no refusals, no
-	// provenance, no harness. The smoke's two assertion classes are seen
-	// RED against this empty-but-well-formed report before any row lands.
+	// A report-emitting run refuses to start unlabeled or untraceable:
+	// hardware is operator-stated (D-SL5-3), provenance enforced (D-SL5-8).
+	if *hardware == "" {
+		fatalf("-hardware is required: a report must state the machine it ran on (D-SL5-3); refusing to run")
+	}
+	commit, err := vcsCommit()
+	if err != nil {
+		fatalf("%v", err)
+	}
+	if *iters < 1 || *c < 1 {
+		fatalf("-iters and -c must be >= 1")
+	}
+
+	// SKELETON (PLAN row 1, rows 3-4 pending): the harness and real report
+	// land at their build rows; the stub writes an empty-but-well-formed
+	// report so the smoke's field assertions stay RED.
 	cfg := benchConfig{hardware: *hardware, storage: *storage, iters: *iters,
 		duration: *duration, warmup: *warmup, c: *c, out: *out}
 	if err := os.MkdirAll(cfg.out, 0o755); err != nil {
 		fatalf("%v", err)
 	}
 	date := time.Now().UTC().Format("2006-01-02")
-	path := filepath.Join(cfg.out, date+"-"+".json")
+	path := filepath.Join(cfg.out, date+"-"+commit+".json")
 	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
 		fatalf("%v", err)
 	}
@@ -65,4 +79,35 @@ func main() {
 func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "bench: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// vcsCommit enforces D-SL5-8: refuse without a VCS revision in the build
+// info — plain `go run` embeds none, and the report would carry an empty
+// commit label under a <date>-.json filename. A modified tree stamps
+// "-dirty" into the commit (and so the filename).
+func vcsCommit() (string, error) {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", fmt.Errorf("no build info in this binary: use `go run -buildvcs=true ./cmd/bench` or a built binary (D-SL5-8)")
+	}
+	var rev string
+	var dirty bool
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if rev == "" {
+		return "", fmt.Errorf("no VCS revision in build info — plain `go run` embeds none; use `go run -buildvcs=true ./cmd/bench` or a built binary (D-SL5-8)")
+	}
+	if len(rev) > 12 {
+		rev = rev[:12]
+	}
+	if dirty {
+		rev += "-dirty"
+	}
+	return rev, nil
 }
