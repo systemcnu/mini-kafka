@@ -59,8 +59,10 @@ func main() {
 	flag.Parse()
 
 	if *renderReadme != "" {
-		_ = *readme
-		return // SKELETON: the renderer lands at its build row (D-SL5-4)
+		if err := renderMode(*renderReadme, *readme); err != nil {
+			fatalf("%v", err)
+		}
+		return
 	}
 
 	// A report-emitting run refuses to start unlabeled or untraceable:
