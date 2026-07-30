@@ -1,0 +1,68 @@
+{
+  "title": "closed-loop response latency",
+  "commit": "abc123def456",
+  "timestamp": "2026-07-30T12:00:00Z",
+  "hardware": "FixtureBook Pro M9, 64 GB RAM",
+  "os": "darwin",
+  "arch": "arm64",
+  "go_version": "go1.24.0",
+  "gomaxprocs": 10,
+  "storage": "fixture NVMe (stated)",
+  "fsync_mode": "fsync (DD-7: plain File.Sync; macOS fsync may not flush the drive cache)",
+  "group_commit_window_ms": 5,
+  "load_model": "closed-loop, C=8 sync producers, in-flight 1/conn",
+  "message_size": 1024,
+  "partitions": 4,
+  "warmup_seconds": 2,
+  "run_seconds": 10,
+  "percentile_method": "nearest-rank on sorted samples",
+  "method_notes": [
+    "e2e latency is wall-clock, same process both ends; a clock step mid-run lands in the numbers (G-SL5-2)",
+    "the consumer commits once per iteration boundary, outside the sampled path",
+    "the warm-up bucket is measured and discarded",
+    "e2e is sampled only for records received in-window; consumer lag inflates latency honestly and shows in e2e_samples (G-SL5-3)"
+  ],
+  "iterations": [
+    {
+      "duration_seconds": 10.01,
+      "msgs_acked": 15034,
+      "msgs_per_sec": 1502.1,
+      "mb_per_sec": 1.54,
+      "ack_p50_ms": 5.21,
+      "ack_p99_ms": 9.87,
+      "e2e_p50_ms": 11.02,
+      "e2e_p99_ms": 19.44,
+      "e2e_samples": 14980,
+      "gc_pause_delta_ms": 0.42,
+      "gc_count_delta": 3,
+      "produce_errors": 7,
+      "duplicates": 3
+    },
+    {
+      "duration_seconds": 10.02,
+      "msgs_acked": 15361,
+      "msgs_per_sec": 1533.2,
+      "mb_per_sec": 1.57,
+      "ack_p50_ms": 5.18,
+      "ack_p99_ms": 10.11,
+      "e2e_p50_ms": 10.88,
+      "e2e_p99_ms": 21.07,
+      "e2e_samples": 15290,
+      "gc_pause_delta_ms": 0,
+      "gc_count_delta": 0,
+      "produce_errors": 0,
+      "duplicates": 0
+    }
+  ],
+  "spread": {
+    "msgs_per_sec": { "min": 1502.1, "max": 1533.2, "mean": 1517.6 },
+    "ack_p99_ms": { "min": 9.87, "max": 10.11, "mean": 9.99 },
+    "e2e_p99_ms": { "min": 19.44, "max": 21.07, "mean": 20.25 }
+  },
+  "caveats": [
+    "closed-loop load understates the queueing tails an open-loop arrival process would show",
+    "ack latency includes the broker's 5 ms group-commit window",
+    "fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)",
+    "no capacity claims: fixed closed-loop response numbers, not a maximum"
+  ]
+}

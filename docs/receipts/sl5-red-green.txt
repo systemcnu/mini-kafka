@@ -1,0 +1,106 @@
+SL5 red-before-green receipts (machine-piped; per new test file).
+Convention: RED runs show every test failing against the commit-1
+SKELETON bench (PLAN row 1: full flag set + full Report schema, but a
+stub run writing an empty-but-well-formed "{}" report under the F1 trap
+filename <date>-.json, no refusals, markers-only render, identity
+splice). Both smoke assertion classes (must-be-positive struct fields
+and raw-JSON key presence, F2/CF3), both refusal paths (D-SL5-3/8), the
+fixture render leg and the splice legs are seen RED; the real-README
+gate leg ends the builder phase in its NAMED SKIP state (D-SL5-4
+bootstrap rule) — that skip line is itself the receipt. Determinism is
+a guard leg: green by design at the skeleton (markers-only render is
+trivially deterministic). Builder: SL5 rows 1-6.
+
+=== cmd/bench/bench_test.go — RED (skeleton: empty report, no refusals) — Thu Jul 30 10:18:50 CDT 2026 ===
+$ go test ./cmd/bench/ -count=1 -run 'TestBenchSmoke|TestHardwareRefusal|TestNoVCSRefusal' -v
+=== RUN   TestBenchSmoke
+    bench_test.go:91: report filename "2026-07-30-.json", want <utc-date>-<commit>.json (D-SL5-2/8)
+    bench_test.go:94: filename "2026-07-30-.json" does not derive from the report's own timestamp+commit ("-.json")
+    bench_test.go:99: title = "", want the DD-22 title
+    bench_test.go:102: hardware = "", want the -hardware value
+    bench_test.go:111: label timestamp empty, want non-empty (BENCH-2)
+    bench_test.go:111: label arch empty, want non-empty (BENCH-2)
+    bench_test.go:111: label load_model empty, want non-empty (BENCH-2)
+    bench_test.go:111: label percentile_method empty, want non-empty (BENCH-2)
+    bench_test.go:111: label commit empty, want non-empty (BENCH-2)
+    bench_test.go:111: label os empty, want non-empty (BENCH-2)
+    bench_test.go:111: label go_version empty, want non-empty (BENCH-2)
+    bench_test.go:111: label storage empty, want non-empty (BENCH-2)
+    bench_test.go:111: label fsync_mode empty, want non-empty (BENCH-2)
+    bench_test.go:115: gomaxprocs = 0, want > 0
+    bench_test.go:118: group_commit_window_ms = 0, want the broker's 5 (F4/CF2)
+    bench_test.go:121: message_size = 0, want 1024
+    bench_test.go:124: partitions = 0, want 4
+    bench_test.go:127: warmup_seconds/run_seconds = 0/0, want both > 0
+    bench_test.go:130: iterations = 0 rows, want 2 (-iters 2)
+    bench_test.go:162: spread msgs_per_sec mean = 0, want > 0
+    bench_test.go:162: spread ack_p99_ms mean = 0, want > 0
+    bench_test.go:162: spread e2e_p99_ms mean = 0, want > 0
+    bench_test.go:172: raw report lacks key "produce_errors" — zero-legal fields must be PRESENT (F2/CF3)
+    bench_test.go:172: raw report lacks key "duplicates" — zero-legal fields must be PRESENT (F2/CF3)
+    bench_test.go:172: raw report lacks key "gc_pause_delta_ms" — zero-legal fields must be PRESENT (F2/CF3)
+    bench_test.go:172: raw report lacks key "gc_count_delta" — zero-legal fields must be PRESENT (F2/CF3)
+    bench_test.go:191: no caveat contains "understates the queueing tails" (D-SL5-2)
+    bench_test.go:191: no caveat contains "5 ms group-commit window" (D-SL5-2)
+    bench_test.go:191: no caveat contains "may not flush the drive cache" (D-SL5-2)
+    bench_test.go:191: no caveat contains "no capacity claims" (D-SL5-2)
+--- FAIL: TestBenchSmoke (0.17s)
+=== RUN   TestHardwareRefusal
+    bench_test.go:202: bench ran without -hardware, want refusal (D-SL5-3)
+        output:
+        bench: report written to /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestHardwareRefusal2447394151/001/2026-07-30-.json
+--- FAIL: TestHardwareRefusal (0.00s)
+=== RUN   TestNoVCSRefusal
+    bench_test.go:218: VCS-less binary emitted a report, want refusal (D-SL5-8)
+        output:
+        bench: report written to /var/folders/9p/sxxl44yd7816kcfh24ch0wym0000gn/T/TestNoVCSRefusal3889800882/001/2026-07-30-.json
+--- FAIL: TestNoVCSRefusal (0.14s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/bench	0.760s
+FAIL
+
+=== cmd/bench/render_test.go — RED (skeleton: markers-only render, identity splice) + gate leg NAMED SKIP — Thu Jul 30 10:18:51 CDT 2026 ===
+$ go test ./cmd/bench/ -count=1 -run 'TestRenderFixture|TestRenderDeterminism|TestSpliceReadme|TestReadmeBenchSectionMatchesCommittedReport' -v
+=== RUN   TestRenderFixture
+    render_test.go:76: rendered section lacks "## Benchmarks — closed-loop response latency"
+    render_test.go:76: rendered section lacks "| 1 | 1502.1 | 1.54 | 5.21 | 9.87 | 11.02 | 19.44 | 14980 | 7 | 3 |"
+    render_test.go:76: rendered section lacks "| 2 | 1533.2 | 1.57 | 5.18 | 10.11 | 10.88 | 21.07 | 15290 | 0 | 0 |"
+    render_test.go:76: rendered section lacks "- msgs/s: 1502.1 / 1533.2 / 1517.6"
+    render_test.go:76: rendered section lacks "- ack p99 ms: 9.87 / 10.11 / 9.99"
+    render_test.go:76: rendered section lacks "- e2e p99 ms: 19.44 / 21.07 / 20.25"
+    render_test.go:76: rendered section lacks "- hardware: FixtureBook Pro M9, 64 GB RAM"
+    render_test.go:76: rendered section lacks "- OS/arch: darwin/arm64"
+    render_test.go:76: rendered section lacks "- Go: go1.24.0"
+    render_test.go:76: rendered section lacks "- GOMAXPROCS: 10"
+    render_test.go:76: rendered section lacks "- commit: abc123def456"
+    render_test.go:76: rendered section lacks "- storage: fixture NVMe (stated)"
+    render_test.go:76: rendered section lacks "- fsync mode: fsync (DD-7: plain File.Sync; macOS fsync may not flush the drive cache)"
+    render_test.go:76: rendered section lacks "- group-commit window: 5 ms"
+    render_test.go:76: rendered section lacks "- load model: closed-loop, C=8 sync producers, in-flight 1/conn"
+    render_test.go:76: rendered section lacks "- message size: 1024 bytes"
+    render_test.go:76: rendered section lacks "- partitions: 4"
+    render_test.go:76: rendered section lacks "- run: 2 iterations × 10.0 s"
+    render_test.go:76: rendered section lacks "- warm-up: 2.0 s (measured, discarded)"
+    render_test.go:76: rendered section lacks "- percentile method: nearest-rank on sorted samples"
+    render_test.go:76: rendered section lacks "- closed-loop load understates the queueing tails an open-loop arrival process would show"
+    render_test.go:76: rendered section lacks "- ack latency includes the broker's 5 ms group-commit window"
+    render_test.go:76: rendered section lacks "- fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)"
+    render_test.go:76: rendered section lacks "- no capacity claims: fixed closed-loop response numbers, not a maximum"
+    render_test.go:76: rendered section lacks "Source report: `benchmarks/reports/2026-07-30-abc123def456.json`"
+--- FAIL: TestRenderFixture (0.00s)
+=== RUN   TestRenderDeterminism
+--- PASS: TestRenderDeterminism (0.00s)
+=== RUN   TestSpliceReadme
+=== RUN   TestSpliceReadme/replaces_between_markers
+    render_test.go:102: splice = "intro\n\n<!-- bench:begin -->\nOLD\n<!-- bench:end -->\n\ntail\n", want "intro\n\n<!-- bench:begin -->\nNEW\n<!-- bench:end -->\n\ntail\n"
+=== RUN   TestSpliceReadme/appends_at_the_EOF_anchor_when_markers_absent
+    render_test.go:112: splice = "intro\n", want "intro\n\n<!-- bench:begin -->\nNEW\n<!-- bench:end -->\n"
+--- FAIL: TestSpliceReadme (0.00s)
+    --- FAIL: TestSpliceReadme/replaces_between_markers (0.00s)
+    --- FAIL: TestSpliceReadme/appends_at_the_EOF_anchor_when_markers_absent (0.00s)
+=== RUN   TestReadmeBenchSectionMatchesCommittedReport
+    render_test.go:138: bootstrap (D-SL5-4): no committed report in benchmarks/reports/ — gate arms when the reference report lands
+--- SKIP: TestReadmeBenchSectionMatchesCommittedReport (0.00s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/bench	0.493s
+FAIL
