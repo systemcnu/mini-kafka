@@ -43,10 +43,10 @@ var reportMethodNotes = []string{
 // time. Zero-legal counters (errors, duplicates, GC deltas) carry no
 // omitempty — presence in the JSON text is part of the contract (F2/CF3).
 type Report struct {
-	Title               string      `json:"title"`                  // "closed-loop response latency" (DD-22)
-	Commit              string      `json:"commit"`                 // short vcs.revision, "-dirty" when the tree was modified (D-SL5-8)
-	Timestamp           string      `json:"timestamp"`              // RFC3339 UTC; its date prefix names the report file
-	Hardware            string      `json:"hardware"`               // operator-stated via -hardware (G-SL5-1)
+	Title               string      `json:"title"`     // "closed-loop response latency" (DD-22)
+	Commit              string      `json:"commit"`    // short vcs.revision, "-dirty" when the tree was modified (D-SL5-8)
+	Timestamp           string      `json:"timestamp"` // RFC3339 UTC; its date prefix names the report file
+	Hardware            string      `json:"hardware"`  // operator-stated via -hardware (G-SL5-1)
 	OS                  string      `json:"os"`
 	Arch                string      `json:"arch"`
 	GoVersion           string      `json:"go_version"`
@@ -77,7 +77,7 @@ type Iteration struct {
 	AckP99Ms        float64 `json:"ack_p99_ms"`
 	E2eP50Ms        float64 `json:"e2e_p50_ms"`
 	E2eP99Ms        float64 `json:"e2e_p99_ms"`
-	E2eSamples      int     `json:"e2e_samples"` // shrinks honestly when the consumer lags (G-SL5-3)
+	E2eSamples      int     `json:"e2e_samples"`       // shrinks honestly when the consumer lags (G-SL5-3)
 	GCPauseDeltaMs  float64 `json:"gc_pause_delta_ms"` // boundary-snapshot delta
 	GCCountDelta    int     `json:"gc_count_delta"`
 	ProduceErrors   int     `json:"produce_errors"`

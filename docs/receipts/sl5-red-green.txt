@@ -104,3 +104,74 @@ $ go test ./cmd/bench/ -count=1 -run 'TestRenderFixture|TestRenderDeterminism|Te
 FAIL
 FAIL	github.com/systemcnu/mini-kafka/cmd/bench	0.493s
 FAIL
+
+=== cmd/bench/bench_test.go — GREEN (rows 2-4: provenance gate, refusals, harness, report writing) — Thu Jul 30 10:23:44 CDT 2026 ===
+$ go test ./cmd/bench/ -count=1 -run 'TestBenchSmoke|TestHardwareRefusal|TestNoVCSRefusal' -v
+=== RUN   TestBenchSmoke
+--- PASS: TestBenchSmoke (2.63s)
+=== RUN   TestHardwareRefusal
+--- PASS: TestHardwareRefusal (0.01s)
+=== RUN   TestNoVCSRefusal
+--- PASS: TestNoVCSRefusal (0.20s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	3.447s
+
+=== cmd/bench/render_test.go — GREEN (row 5: renderer + splice; gate leg still in its NAMED bootstrap SKIP — the builder-phase exit state, D-SL5-4) — Thu Jul 30 10:23:47 CDT 2026 ===
+$ go test ./cmd/bench/ -count=1 -run 'TestRenderFixture|TestRenderDeterminism|TestSpliceReadme|TestReadmeBenchSectionMatchesCommittedReport' -v
+=== RUN   TestRenderFixture
+--- PASS: TestRenderFixture (0.00s)
+=== RUN   TestRenderDeterminism
+--- PASS: TestRenderDeterminism (0.00s)
+=== RUN   TestSpliceReadme
+=== RUN   TestSpliceReadme/replaces_between_markers
+=== RUN   TestSpliceReadme/appends_at_the_EOF_anchor_when_markers_absent
+--- PASS: TestSpliceReadme (0.00s)
+    --- PASS: TestSpliceReadme/replaces_between_markers (0.00s)
+    --- PASS: TestSpliceReadme/appends_at_the_EOF_anchor_when_markers_absent (0.00s)
+=== RUN   TestReadmeBenchSectionMatchesCommittedReport
+    render_test.go:138: bootstrap (D-SL5-4): no committed report in benchmarks/reports/ — gate arms when the reference report lands
+--- SKIP: TestReadmeBenchSectionMatchesCommittedReport (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	0.519s
+
+=== full suite — GREEN by command (row 6) — Thu Jul 30 10:24:27 CDT 2026 ===
+$ go test -race -count=1 ./...
+ok  	github.com/systemcnu/mini-kafka/client	12.413s
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	5.905s
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	24.032s
+?   	github.com/systemcnu/mini-kafka/cmd/minikafka	[no test files]
+?   	github.com/systemcnu/mini-kafka/cmd/mk	[no test files]
+ok  	github.com/systemcnu/mini-kafka/internal/broker	24.779s
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	12.495s
+ok  	github.com/systemcnu/mini-kafka/internal/group	5.952s
+ok  	github.com/systemcnu/mini-kafka/internal/storage	12.762s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	2.660s
+ok  	github.com/systemcnu/mini-kafka/internal/wire	1.922s
+
+$ go test -race -count=1 ./... -v 2>&1 | grep -c -- '--- PASS'
+151
+(skips in the -v transcript: )
+--- SKIP: TestReadmeBenchSectionMatchesCommittedReport (0.01s)
+
+=== scripts/checks.sh — GREEN by command (row 6; pinned staticcheck 2025.1.1) — Thu Jul 30 10:24:27 CDT 2026 ===
+$ bash scripts/checks.sh
+== build
+== vet
+== staticcheck (pinned, same as CI)
+== gofmt check
+== stdlib audit
+stdlib audit OK
+== test
+ok  	github.com/systemcnu/mini-kafka/client	10.920s
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	4.791s
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	19.533s
+?   	github.com/systemcnu/mini-kafka/cmd/minikafka	[no test files]
+?   	github.com/systemcnu/mini-kafka/cmd/mk	[no test files]
+ok  	github.com/systemcnu/mini-kafka/internal/broker	24.057s
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	11.327s
+ok  	github.com/systemcnu/mini-kafka/internal/group	6.216s
+ok  	github.com/systemcnu/mini-kafka/internal/storage	10.813s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.464s
+ok  	github.com/systemcnu/mini-kafka/internal/wire	0.603s
+== linux cross-build (local Linux proxy)
+ALL CHECKS GREEN
