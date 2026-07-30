@@ -229,6 +229,10 @@ CARDS = [
                 ("internal/broker/registry_test.go", "internal/broker/registry_test.go", "file"),
                 ("internal/wire/errors_test.go", "internal/wire/errors_test.go", "file"),
             ]),
+            ("SL5: bench (smoke · render gate)", [
+                ("cmd/bench/bench_test.go", "cmd/bench/bench_test.go", "file"),
+                ("cmd/bench/render_test.go", "cmd/bench/render_test.go", "file"),
+            ]),
             ("fault scripting seam", [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
@@ -249,6 +253,23 @@ CARDS = [
             ("the external clock", [
                 ("scripts/demo_timing.sh", "scripts/demo_timing.sh", "file"),
                 ("scripts/demo_timing_test.sh", "scripts/demo_timing_test.sh", "file"),
+            ]),
+        ],
+    },
+    {
+        "id": "bench", "nick": "the honest scale", "icon": "\U0001f4ca", "tint": "cmd",
+        "file": "cmd/bench — main.go · report.go · render.go", "col": 3, "row": 3,
+        "purpose": "The closed-loop benchmark: every number born labeled (hardware, commit, fsync reality, caveats), the README section a pure render of a committed report, hand-edits a build failure.",
+        "groups": [
+            ("the harness", [
+                ("cmd/bench/main.go", "cmd/bench/main.go", "file"),
+                ("cmd/bench/report.go", "buildReport", "func"),
+            ]),
+            ("the honesty chain", [
+                ("cmd/bench/report.go", "Report", "type"),
+                ("cmd/bench/report.go", "reportFileName", "func"),
+                ("cmd/bench/render.go", "render", "func"),
+                ("cmd/bench/render.go", "spliceReadme", "func"),
             ]),
         ],
     },
