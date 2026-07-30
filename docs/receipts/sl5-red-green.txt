@@ -175,3 +175,10 @@ ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	0.464s
 ok  	github.com/systemcnu/mini-kafka/internal/wire	0.603s
 == linux cross-build (local Linux proxy)
 ALL CHECKS GREEN
+
+=== INTEGRATOR VERIFICATION — under-load smoke flake caught and bounded (Thu Jul 30 10:42:18 CDT 2026) ===
+Full-suite -race run: TestBenchSmoke aborted once with 'unknown or dead member' at a boundary commit — the bench correctly refuses to measure through a member sweep; under full-suite load the heartbeat gap can exceed the 2 s session window with no bench defect. 5/5 isolated runs green (load-coupled). Fix: the smoke retries ONCE, loudly, on exactly that abort (SL4's bounded-retry pattern); a second sweep stays red by design.
+Post-patch: 6 consecutive full-suite -race runs green; run 5 exercised the retry live:
+    bench_test.go:78: bench aborted on an under-load member sweep — retrying once:
+        bench: commit at boundary 1: broker error 13: unknown or dead member: m1 in group bench
+Final counts by command: 152 PASS / 0 FAIL / 0 SKIP (gate leg armed by the committed reference report).
