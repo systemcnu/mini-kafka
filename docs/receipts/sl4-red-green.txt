@@ -174,3 +174,22 @@ $ go test -race ./... -v 2>&1 | grep -c -- '--- PASS'
 Audit-table cap-row count by command (no hand-typed numbers):
 $ awk '/Cap inventory audit table/,/package broker/' internal/broker/registry_test.go | grep -cE '^//	(1[0-2]| [1-9]) '
 12
+
+=== INTEGRATOR VERIFICATION — stop-hammer flake caught and fixed (Wed Jul 29 23:25:08 CDT 2026) ===
+Builder's single-conn hammer: 30 isolated runs green, but the integrator's fresh full-suite -race -count=1 run and a 10-parallel-run load test both hit 20/20 attempt misses (0 code-10 frames). Failing excerpt (parallel run h_3):
+    registry_test.go:239: stop-hammer attempt 1: 0 code-10 frame(s) before EOF
+    registry_test.go:239: stop-hammer attempt 2: 0 code-10 frame(s) before EOF
+    registry_test.go:239: stop-hammer attempt 19: 0 code-10 frame(s) before EOF
+    registry_test.go:239: stop-hammer attempt 20: 0 code-10 frame(s) before EOF
+    registry_test.go:247: no SHUTTING_DOWN frame observed across 20 stop-hammer attempts
+Fix (commit follows): drain window SCRIPTED via slowSyncer(200ms) + a SECOND collecting conn (a serialized conn cannot collect inside the window its own produce holds open). Post-fix:
+    registry_test.go:263: stop-hammer attempt 1: 10069 code-10 frame(s) before EOF
+--- PASS: TestScenarioH (0.69s)
+ok  	github.com/systemcnu/mini-kafka/internal/broker	1.953s
+
+=== EXIT SABOTAGE (integrator's hands, DESIGN §6.4) — Wed Jul 29 23:25:41 CDT 2026 ===
+handleProduce payload cap check weakened to MaxPayload*100 →
+--- FAIL: TestOversizedPayloadRejectedAndNothingWritten
+--- FAIL: TestScenarioH (MSG_TOO_LARGE never served; bytes-unchanged violated)
+restored →
+ok  	github.com/systemcnu/mini-kafka/internal/broker	1.979s
