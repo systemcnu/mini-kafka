@@ -87,3 +87,38 @@ $ go test ./internal/broker/ -race -count=1 -run TestConnectionCapGuard -v
 --- PASS: TestConnectionCapGuard (0.01s)
 PASS
 ok  	github.com/systemcnu/mini-kafka/internal/broker	1.406s
+
+=== internal/broker/caps_test.go idle rows (all 5, D-SL4-3) — GREEN under -race — Wed Jul 29 23:12:34 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run 'TestIdleConnReclaimed|TestHeartbeatingConnSurvivesIdleWindow|TestIdleReclaimFreesCapSlots|TestParkedFetchSurvivesIdleTimeout|TestStalledReaderReclaimedByWriteDeadline' -v
+=== RUN   TestIdleConnReclaimed
+--- PASS: TestIdleConnReclaimed (0.21s)
+=== RUN   TestHeartbeatingConnSurvivesIdleWindow
+--- PASS: TestHeartbeatingConnSurvivesIdleWindow (2.11s)
+=== RUN   TestIdleReclaimFreesCapSlots
+--- PASS: TestIdleReclaimFreesCapSlots (0.31s)
+=== RUN   TestParkedFetchSurvivesIdleTimeout
+--- PASS: TestParkedFetchSurvivesIdleTimeout (0.69s)
+=== RUN   TestStalledReaderReclaimedByWriteDeadline
+--- PASS: TestStalledReaderReclaimedByWriteDeadline (1.70s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	6.376s
+
+=== TestStalledReaderReclaimedByWriteDeadline — RED (sabotage, DESIGN §4/§6.4: serveRequest's response SetWriteDeadline removed, read deadline left in — proves the test discriminates the WRITE deadline, F3) — Wed Jul 29 23:12:34 CDT 2026 ===
+$ go test ./internal/broker/ -count=1 -run TestStalledReaderReclaimedByWriteDeadline -v
+    caps_test.go:407: drained 3686466 bytes ≥ the 3686400-byte response — the stalled conn was never reclaimed
+--- FAIL: TestStalledReaderReclaimedByWriteDeadline (1.98s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/broker	2.220s
+FAIL
+
+=== TestStalledReaderReclaimedByWriteDeadline — GREEN (write deadline restored, -race) — Wed Jul 29 23:12:34 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run TestStalledReaderReclaimedByWriteDeadline
+ok  	github.com/systemcnu/mini-kafka/internal/broker	2.937s
+
+=== client/group_test.go TestPausedPollRedialsAfterIdleReclaim — RED (natural, rows 4→5: broker idle reclaim live, client EOF/reset trigger not yet shipped — the spurious hard error D-SL4-7(4) forbids) — Wed Jul 29 23:12:34 CDT 2026 ===
+$ go test ./client/ -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
+    group_test.go:532: Poll: EOF
+--- FAIL: TestPausedPollRedialsAfterIdleReclaim (3.31s)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/client	3.549s
+FAIL

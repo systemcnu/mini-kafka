@@ -15,11 +15,12 @@ import (
 	"github.com/systemcnu/mini-kafka/internal/wire"
 )
 
-// Defaults (DD-24, D-SL0-7/8).
+// Defaults (DD-24, D-SL0-7/8; DefaultIdleTimeout is D-SL4-3's).
 const (
-	DefaultAddr     = "127.0.0.1:7621"
-	DefaultMaxConns = 256
-	drainTimeout    = 5 * time.Second
+	DefaultAddr        = "127.0.0.1:7621"
+	DefaultMaxConns    = 256
+	DefaultIdleTimeout = 5 * time.Minute
+	drainTimeout       = 5 * time.Second
 )
 
 // Config configures a broker. Zero values take the defaults above.
@@ -36,10 +37,11 @@ type Config struct {
 // Server is the broker: it owns the storage.Store, the group coordinator,
 // and the listener. Create with New, run with Start, stop (once) with Stop.
 type Server struct {
-	store    *storage.Store
-	coord    *group.Coordinator
-	addr     string
-	maxConns int
+	store       *storage.Store
+	coord       *group.Coordinator
+	addr        string
+	maxConns    int
+	idleTimeout time.Duration
 
 	ln         net.Listener
 	acceptDone chan struct{}
@@ -80,6 +82,9 @@ func newWithFS(cfg Config, fsys storage.FS, syncer storage.Syncer) (*Server, err
 	if cfg.MaxConns == 0 {
 		cfg.MaxConns = DefaultMaxConns
 	}
+	if cfg.IdleTimeout == 0 {
+		cfg.IdleTimeout = DefaultIdleTimeout
+	}
 	store, err := storage.Open(cfg.DataDir, fsys, syncer)
 	if err != nil {
 		return nil, err
@@ -91,13 +96,14 @@ func newWithFS(cfg Config, fsys storage.FS, syncer storage.Syncer) (*Server, err
 	}
 	coord.Run()
 	return &Server{
-		store:      store,
-		coord:      coord,
-		addr:       cfg.Addr,
-		maxConns:   cfg.MaxConns,
-		acceptDone: make(chan struct{}),
-		stopping:   make(chan struct{}),
-		conns:      make(map[net.Conn]chan struct{}),
+		store:       store,
+		coord:       coord,
+		addr:        cfg.Addr,
+		maxConns:    cfg.MaxConns,
+		idleTimeout: cfg.IdleTimeout,
+		acceptDone:  make(chan struct{}),
+		stopping:    make(chan struct{}),
+		conns:       make(map[net.Conn]chan struct{}),
 	}, nil
 }
 
@@ -194,18 +200,24 @@ func (s *Server) dropConn(conn net.Conn, connID uint64) {
 func (s *Server) serveConn(conn net.Conn, cancel <-chan struct{}, connID uint64) {
 	defer s.wg.Done()
 	defer s.dropConn(conn, connID)
-	// No read deadline while waiting for a frame: idle reclaim is SL4's,
-	// and a deadline left armed would kill parked fetches (PLAN pitfall).
 	for {
+		// Idle reclaim (D-SL4-3): armed at the TOP of every iteration, never
+		// during dispatch — a park happens AFTER the frame is read and does
+		// no conn reads, so the stale absolute deadline is harmless and
+		// replaced here. Expiry surfaces as a plain net.Error (never a
+		// *wire.Error) and lands in the silent-close branch below: the peer
+		// is absent by definition, a farewell frame can stall (G-SL4-1).
+		conn.SetReadDeadline(time.Now().Add(s.idleTimeout))
 		typ, payload, err := wire.ReadFrame(conn, wire.MaxRequestFrame)
 		if err != nil {
 			var werr *wire.Error
 			if errors.As(err, &werr) {
 				// Oversized frame or bad version: serve the error, then
 				// close — the stream is not trustworthy past this point.
+				conn.SetWriteDeadline(time.Now().Add(s.idleTimeout))
 				s.writeError(conn, werr)
 			}
-			// Partial frame / clean close: just close (debug log only).
+			// Partial frame / clean close / idle expiry: just close.
 			return
 		}
 		if !s.serveRequest(conn, typ, payload, cancel, connID) {
@@ -222,9 +234,15 @@ func (s *Server) serveRequest(conn net.Conn, typ byte, payload []byte, cancel <-
 	defer s.inflight.Add(-1)
 
 	if s.draining.Load() {
+		conn.SetWriteDeadline(time.Now().Add(s.idleTimeout))
 		return s.writeError(conn, wire.Errf(wire.CodeShuttingDown, "broker is shutting down"))
 	}
 	respType, respBody, werr, closeAfter := s.dispatch(typ, payload, cancel, connID)
+	// Response writes get their own idle window (D-SL4-3): a client that
+	// won't drain its response is the same leaked conn idle reclaim exists
+	// to evict. Armed AFTER dispatch — a legal park (≤30 s) may outlive
+	// IdleTimeout, so the clock starts at the write, never before it.
+	conn.SetWriteDeadline(time.Now().Add(s.idleTimeout))
 	if werr != nil {
 		if !s.writeError(conn, werr) {
 			return false
