@@ -76,7 +76,7 @@ CARDS = [
     {
         "id": "srv", "nick": "the one door", "icon": "\U0001f6aa", "tint": "broker",
         "file": "internal/broker/server.go", "col": 3, "row": 1,
-        "purpose": "Accepts every connection under a 256-conn cap, reads one frame at a time, and runs the ordered graceful stop.",
+        "purpose": "Accepts every connection under a 256-conn cap (over-cap conns get a served error frame), reads one frame at a time under the 5-minute idle-reclaim deadline, and runs the ordered graceful stop.",
         "groups": [
             ("lifecycle", [
                 ("internal/broker/server.go", "New", "func"),
@@ -193,6 +193,7 @@ CARDS = [
             ("registry", [
                 ("internal/wire/errors.go", "Code", "type"),
                 ("internal/wire/errors.go", "Errf", "func"),
+                ("internal/wire/errors.go", "AllCodes", "func"),
                 ("internal/wire/names.go", "ValidateName", "func"),
             ]),
         ],
@@ -200,7 +201,7 @@ CARDS = [
     {
         "id": "proofs", "nick": "the proving ground", "icon": "\U0001f9ea", "tint": "proofs",
         "file": "*_test.go · scripts/checks.sh", "col": 3, "row": 2,
-        "purpose": "The proof battery: ack-ordering recorder, the full recovery fault matrix, degrade suite, kill -9 crash cycles, live caps over the wire.",
+        "purpose": "The proof battery: ack-ordering recorder, the full recovery fault matrix, degrade suite, kill -9 crash cycles, live caps over the wire, and the 13-code hostile battery.",
         "groups": [
             ("key suites", [
                 ("internal/storage/partition_test.go", "internal/storage/partition_test.go", "file"),
@@ -223,6 +224,10 @@ CARDS = [
                 ("internal/broker/group_test.go", "internal/broker/group_test.go", "file"),
                 ("client/group_test.go", "client/group_test.go", "file"),
                 ("internal/e2e/group_e2e_test.go", "internal/e2e/group_e2e_test.go", "file"),
+            ]),
+            ("SL4: hostile inputs (battery · idle · malformed)", [
+                ("internal/broker/registry_test.go", "internal/broker/registry_test.go", "file"),
+                ("internal/wire/errors_test.go", "internal/wire/errors_test.go", "file"),
             ]),
             ("fault scripting seam", [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
