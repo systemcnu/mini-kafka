@@ -177,7 +177,7 @@ func TestBenchSmoke(t *testing.T) {
 	for _, want := range []string{
 		"understates the queueing tails",
 		"5 ms group-commit window",
-		"may not flush the drive cache",
+		"F_FULLFSYNC (drive-cache barrier",
 		"no capacity claims",
 	} {
 		found := false

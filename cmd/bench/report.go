@@ -16,8 +16,12 @@ import (
 
 // Pinned label texts (D-SL5-2).
 const (
-	reportTitle           = "closed-loop response latency" // DD-22's title
-	fsyncModeLabel        = "fsync (DD-7: plain File.Sync; macOS fsync may not flush the drive cache)"
+	reportTitle = "closed-loop response latency" // DD-22's title
+	// Corrected from DD-7's wording at the SL5 exit: Go's os.File.Sync
+	// issues F_FULLFSYNC on macOS (probed: Sync ≈ F_FULLFSYNC ≈ 5.5 ms vs
+	// raw fsync(2) ≈ 0.1 ms) — the drive cache IS flushed there, which is
+	// also why durable-mode numbers on macOS look the way they do.
+	fsyncModeLabel        = "fsync via Go os.File.Sync (macOS: F_FULLFSYNC, a full drive-cache barrier; Linux: fsync)"
 	percentileMethodLabel = "nearest-rank on sorted samples"
 )
 
@@ -26,7 +30,7 @@ const (
 var reportCaveats = []string{
 	"closed-loop load understates the queueing tails an open-loop arrival process would show",
 	"ack latency includes the broker's 5 ms group-commit window",
-	"fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)",
+	"durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)",
 	"no capacity claims: fixed closed-loop response numbers, not a maximum",
 }
 
@@ -52,7 +56,7 @@ type Report struct {
 	GoVersion           string      `json:"go_version"`
 	GOMAXPROCS          int         `json:"gomaxprocs"`
 	Storage             string      `json:"storage"`                // operator-stated via -storage; the default says "(unverified)"
-	FsyncMode           string      `json:"fsync_mode"`             // "fsync" + the DD-7 platform caveat
+	FsyncMode           string      `json:"fsync_mode"`             // what Sync really does per platform (DD-7, corrected)
 	GroupCommitWindowMs int         `json:"group_commit_window_ms"` // broker flusher window — ack latency floors here (F4/CF2)
 	LoadModel           string      `json:"load_model"`
 	MessageSize         int         `json:"message_size"` // payload bytes (1024), not the frame

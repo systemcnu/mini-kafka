@@ -56,7 +56,7 @@ func TestRenderFixture(t *testing.T) {
 		"- GOMAXPROCS: 10",
 		"- commit: abc123def456",
 		"- storage: fixture NVMe (stated)",
-		"- fsync mode: fsync (DD-7: plain File.Sync; macOS fsync may not flush the drive cache)",
+		"- fsync mode: fsync via Go os.File.Sync (macOS: F_FULLFSYNC, a full drive-cache barrier; Linux: fsync)",
 		"- group-commit window: 5 ms",
 		"- load model: closed-loop, C=8 sync producers, in-flight 1/conn",
 		"- message size: 1024 bytes",
@@ -67,7 +67,7 @@ func TestRenderFixture(t *testing.T) {
 		// both caveat blocks' texts, verbatim from the report
 		"- closed-loop load understates the queueing tails an open-loop arrival process would show",
 		"- ack latency includes the broker's 5 ms group-commit window",
-		"- fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)",
+		"- durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)",
 		"- no capacity claims: fixed closed-loop response numbers, not a maximum",
 		// the source report path, repo-root-relative (F9)
 		"Source report: `benchmarks/reports/2026-07-30-abc123def456.json`",

@@ -8,7 +8,7 @@
   "go_version": "go1.24.0",
   "gomaxprocs": 10,
   "storage": "fixture NVMe (stated)",
-  "fsync_mode": "fsync (DD-7: plain File.Sync; macOS fsync may not flush the drive cache)",
+  "fsync_mode": "fsync via Go os.File.Sync (macOS: F_FULLFSYNC, a full drive-cache barrier; Linux: fsync)",
   "group_commit_window_ms": 5,
   "load_model": "closed-loop, C=8 sync producers, in-flight 1/conn",
   "message_size": 1024,
@@ -62,7 +62,7 @@
   "caveats": [
     "closed-loop load understates the queueing tails an open-loop arrival process would show",
     "ack latency includes the broker's 5 ms group-commit window",
-    "fsync durability is platform-qualified: macOS fsync may not flush the drive cache (DD-7)",
+    "durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)",
     "no capacity claims: fixed closed-loop response numbers, not a maximum"
   ]
 }
