@@ -80,3 +80,10 @@ $ go test ./client/ -count=1 -run TestPausedPollRedialsAfterIdleReclaim -v
 --- PASS: TestPausedPollRedialsAfterIdleReclaim (3.52s)
 PASS
 ok  	github.com/systemcnu/mini-kafka/client	3.748s
+
+=== internal/broker/caps_test.go TestConnectionCapGuard — GREEN (row 3: served CAP_EXCEEDED frame, wg-tracked writer; -race incl. Stop with an unread over-cap writer in flight) — Wed Jul 29 23:10:59 CDT 2026 ===
+$ go test ./internal/broker/ -race -count=1 -run TestConnectionCapGuard -v
+=== RUN   TestConnectionCapGuard
+--- PASS: TestConnectionCapGuard (0.01s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/internal/broker	1.406s

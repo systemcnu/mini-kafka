@@ -155,9 +155,19 @@ func (s *Server) acceptLoop() {
 		s.connMu.Lock()
 		if len(s.conns) >= s.maxConns {
 			s.connMu.Unlock()
-			// DD-24 accept-guard: over-cap conns are closed immediately;
-			// the served-error-frame polish is SL4's.
-			conn.Close()
+			// DD-24's accept → write error → close (D-SL4-2). The writer
+			// goroutine + 1 s write deadline keep a client that never reads
+			// from wedging the accept loop; wg.Add BEFORE go, so Stop cannot
+			// return with a live writer holding the fd (ordering is safe:
+			// Stop waits on acceptDone before wg.Wait). The conn never
+			// enters s.conns — closing it on every path is the writer's job.
+			s.wg.Add(1)
+			go func() {
+				defer s.wg.Done()
+				defer conn.Close()
+				conn.SetWriteDeadline(time.Now().Add(time.Second))
+				s.writeError(conn, wire.Errf(wire.CodeCapExceeded, "connection cap %d reached", s.maxConns))
+			}()
 			continue
 		}
 		cancel := make(chan struct{})
