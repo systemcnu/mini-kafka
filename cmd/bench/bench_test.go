@@ -68,6 +68,18 @@ func runBench(t *testing.T, bin string, extra ...string) (string, error) {
 func TestBenchSmoke(t *testing.T) {
 	outDir := t.TempDir()
 	out, err := runBench(t, benchBin, "-hardware", "test rig", "-out", outDir)
+	// The bench ABORTS when its member is swept mid-run — correct product
+	// behavior (a rebalance invalidates the closed-loop premise), but under
+	// a saturated full-suite -race run the heartbeat gap can exceed the 2 s
+	// session window with no bench defect present. Retry once, loudly, on
+	// exactly that abort; a second failure is red (SL4's bounded-loud-retry
+	// pattern — caught, like the stop-hammer, only under full-suite load).
+	if err != nil && strings.Contains(out, "unknown or dead member") {
+		t.Logf("bench aborted on an under-load member sweep — retrying once:\n%s", out)
+		os.RemoveAll(outDir)
+		outDir = t.TempDir()
+		out, err = runBench(t, benchBin, "-hardware", "test rig", "-out", outDir)
+	}
 	if err != nil {
 		t.Fatalf("bench failed: %v\noutput:\n%s", err, out)
 	}

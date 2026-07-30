@@ -5,3 +5,9 @@ Sync-cost probe on this machine (drives the fsync label): os.File.Sync p50 5.5ms
 (First build attempt was stamped -dirty by an untracked receipt file present at build time — the D-SL5-8 gate would have rejected it; rebuilt clean.)
 
 bench: report written to benchmarks/reports/2026-07-30-a5796a59d19f.json
+
+=== EXIT SABOTAGE (integrator's hands, DESIGN §5.4) — Thu Jul 30 10:34:05 CDT 2026 ===
+README iteration-1 msgs/s hand-edited 98.3 -> 983.0 →
+--- FAIL: TestReadmeBenchSectionMatchesCommittedReport (byte-compare vs re-render of the committed report)
+restored via -render-readme →
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	0.530s
