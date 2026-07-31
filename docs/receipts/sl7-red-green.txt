@@ -127,3 +127,46 @@ ok  	github.com/systemcnu/mini-kafka/internal/storage	16.997s
 ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	2.948s
 ok  	github.com/systemcnu/mini-kafka/internal/wire	2.571s
 test-function count by command (grep -rn "^func Test" --include=*_test.go . | wc -l): 163 (baseline 147 + 16 new showcase tests)
+
+== VERIFIER SABOTAGE (independent verifier, 2026-07-31) — all four DESIGN §5 candidates, mutate → focused red → git-checkout restore → green ==
+
+-- 1/4 mutating route added (POST /feed handler in newMux) → TestRoutes RED:
+--- FAIL: TestRoutes (0.00s)
+    server_test.go:62: POST /feed: got 202, want 405 (GET-only surface, D-SL7-2)
+   restored → ok  	github.com/systemcnu/mini-kafka/cmd/showcase	0.201s
+
+-- 2/4 cap check disabled (walkerLoop disk>=cap replaced with false) → TestPlateau RED:
+--- FAIL: TestPlateau (30.50s)
+    cap_test.go:80: status never flipped to paused-at-cap: dir kept growing past the 64 KiB test cap (no pause logic)
+   restored → ok  	github.com/systemcnu/mini-kafka/cmd/showcase	4.235s
+
+-- 3/4 broker literal changed to 0.0.0.0:0 (non-loopback) → TestBrokerConfig RED:
+--- FAIL: TestBrokerConfig (0.00s)
+    feeder_test.go:39: brokerConfig("/data/dir").Addr = "0.0.0.0:0", want the hard-coded loopback literal "127.0.0.1:0" (D-SL7-1, SHOW-3 by construction)
+   restored → ok  	github.com/systemcnu/mini-kafka/cmd/showcase	0.203s
+
+-- 4/4 snapshot synchronization bypassed (publishLocked mutates the stored *snapshot in place) → TestConcurrentLoad RED under -race, 28 DATA RACE warnings; first stack:
+WARNING: DATA RACE
+Write at 0x00c00023e1b0 by goroutine 21:
+  github.com/systemcnu/mini-kafka/cmd/showcase.(*feeder).publishLocked()
+      /Users/srirondla/systems-engineering/mini-kafka/cmd/showcase/feeder.go:187 +0x88
+  github.com/systemcnu/mini-kafka/cmd/showcase.(*feeder).consumerLoop()
+      /Users/srirondla/systems-engineering/mini-kafka/cmd/showcase/feeder.go:284 +0x4b0
+  github.com/systemcnu/mini-kafka/cmd/showcase.(*feeder).start.gowrap2()
+      /Users/srirondla/systems-engineering/mini-kafka/cmd/showcase/feeder.go:175 +0x34
+--- FAIL: TestConcurrentLoad (1.26s)
+    testing.go:1490: race detected during execution of test
+   restored → ok  	github.com/systemcnu/mini-kafka/cmd/showcase	2.881s
+
+== INTEGRATOR ANNOTATION (receipt honesty), 2026-07-31 ==
+RED 4 above was captured against the row-1 cap_test as first written (60 s organic-growth
+plateau); row 5 revised that test to a filler-file plateau (commit 6b69386) AFTER the red —
+the revision was unnoted at capture time (verifier finding 1). The CURRENT TestPlateau was
+independently seen red in the verifier's sabotage leg 2 (cap check disabled -> red, 30.5 s),
+receipted in the VERIFIER SABOTAGE section below. Both facts stand; neither is backfilled.
+
+== INTEGRATOR EXIT GATES (Phase A, own hands, bare runs), 2026-07-31 ==
+Witnessed sabotage: broker literal -> 0.0.0.0:0 -> TestBrokerConfig FAIL naming the loopback
+contract (D-SL7-1/SHOW-3) -> restored -> ok. Full suite: go test ./... -race -count=1 -> 12
+packages ok, bare. Verifier PASS (4/4 sabotage incl. 28 race warnings on the sync-removal leg).
+Scrub battery (patterns held outside the repo): files matching = 0 / 0 / 1 (bar: 0 each).
