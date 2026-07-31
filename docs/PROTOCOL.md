@@ -181,6 +181,11 @@ covered by the durable frontier (§11).
 Validation order, defaults, the budget accounting formula, and the parking
 rules are §8.
 
+*Informative:* the multi-entry form (2..16 entries) is a fully supported
+protocol shape with no shipped-client caller — the shipped client only
+issues single-entry raw Fetches, while GroupFetch (type 17) exercises the
+same multi-entry tail. Implement it; nothing about it is vestigial.
+
 ### FetchResp (type 4)
 
 | field | wire form | meaning |
@@ -198,6 +203,9 @@ ascend; a response never carries records past the durable frontier (§11).
 |---|---|---|
 | topic | str | new topic's name, name rule applies |
 | partitions | u32 | partition count, 1..16 (§10) |
+
+The partition count is fixed at creation: this message set contains
+no resize operation (§13).
 
 ### CreateTopicResp (type 6)
 
@@ -302,6 +310,14 @@ identical to a plain Fetch's and there is no GroupFetchResp. Fetch
 validation and parking (§8) apply unchanged; the group fence (§9) runs
 before every serve attempt.
 
+**Why GroupFetch exists:** group fetches must carry memberID and generation
+for serve-time fencing — the plain Fetch shape has no such fields — and the
+topic is implied by the group's binding, so GroupFetch carries no topic
+field (`internal/wire/messages.go`, `internal/broker/handlers.go`). This
+message superseded the original design's prose picture of group reads over
+plain Fetch; that divergence was surfaced and accepted at the SL2 gate
+(D-SL2-2).
+
 ### Error (type 255)
 
 | field | wire form | meaning |
@@ -343,15 +359,161 @@ class — see §7.
 
 ## 7. Connection lifecycle
 
-*(written in the behavior pass — row 3)*
+**One request in flight per connection.** The broker serves a connection
+sequentially: read one frame, dispatch, write the answer, read the next
+(`internal/broker/server.go`, the frame loop). There is no pipelining — a
+second request written early just waits in the socket until the first
+answer is written.
+
+**Idle reclaim is SILENT.** A connection that completes no request for
+5 minutes (`broker.DefaultIdleTimeout`) is closed with no farewell frame —
+the peer is presumed absent, and a goodbye to an absent peer can stall. The
+idle clock is re-armed at the top of every frame read; a legal fetch park
+(§8) happens after the frame arrived and does not trip it.
+
+**Error-then-CLOSE class.** After these Error frames the broker drops the
+connection, because the byte stream is no longer trustworthy or the request
+is unroutable:
+
+- FRAME_TOO_LARGE (oversized frame) and MALFORMED for a short length or a
+  bad version — envelope damage (§2);
+- MALFORMED for an unknown message type.
+
+**Error-then-CONTINUE class.** A malformed BODY and every semantic
+rejection — INVALID_NAME, UNKNOWN_TOPIC, BAD_PARTITION, TOPIC_EXISTS,
+MSG_TOO_LARGE, FETCH_TOO_WIDE, CAP_EXCEEDED on a request field, the group
+fences 12/13 — answer with an Error frame and the connection stays usable
+for the next request.
+
+**CAP_EXCEEDED at the connection cap is UNSOLICITED.** When the broker is
+at its connection cap (§10), an accepted connection is written a
+CAP_EXCEEDED Error frame immediately on accept — before any request is
+sent — under a write deadline of about 1 s, and closed; the connection
+never enters the broker's table. A client that connects but does not read
+promptly can therefore miss the frame entirely and observe only EOF: treat
+an early EOF on a fresh connection as possible cap rejection.
+
+**Graceful-stop drain (SHUTTING_DOWN).** While the broker drains, every
+new request is answered with SHUTTING_DOWN (code 10); fetches already
+parked are released with the empty-at-timeout shape (§8), not an error.
+Connections are closed once in-flight responses are written.
 
 ## 8. Fetch and long-poll
 
-*(written in the behavior pass — row 3)*
+Everything here applies to Fetch (type 3) and GroupFetch (type 17) alike;
+GroupFetch additionally runs the §9 fence before every serve attempt.
+
+**Validation order (as coded, `internal/broker/handlers.go`).** Checks run
+in this order and the first failure answers the whole frame — nothing is
+served partially:
+
+1. body decode → MALFORMED;
+2. name rule → INVALID_NAME;
+3. zero entries → MALFORMED (`fetch requires at least one entry`);
+4. more than 16 entries → FETCH_TOO_WIDE;
+5. `maxWaitMs > 30000` → CAP_EXCEEDED;
+6. `maxBytes > 4 MiB` → CAP_EXCEEDED;
+7. entry resolution → UNKNOWN_TOPIC / BAD_PARTITION (any bad entry fails
+   the whole frame).
+
+Defaults applied after validation: `maxWaitMs = 0` means 5,000 ms;
+`maxBytes = 0` means 1 MiB.
+
+**Budget accounting (normative interop contract).** Records are served
+across the request's entries in request order against ONE shared `maxBytes`
+budget, and each record costs exactly `12 + len(payload)` budget bytes —
+the u64 offset (8 bytes) plus the u32 payload-length prefix (4 bytes) of
+its FetchResp encoding. Two implementations accounting differently would
+diverge on which records fit; this formula is the contract.
+
+**Min-one is per-RESPONSE.** Only the FIRST record served across all
+entries in request order may exceed `maxBytes` — so a single oversized
+record cannot wedge a consumer forever. After that first record the budget
+is strict, which keeps the total under the response frame cap (§2).
+
+**Long-poll parking.** If no requested entry has data at or after its
+offset, the broker parks the fetch until data arrives anywhere in the
+request, the `maxWait` timer fires, or the broker stops. A wake re-serves
+with a full budget (GroupFetch re-fences first, §9).
+
+**Empty-at-timeout shape (pinned).** A fetch that times out — or is caught
+by a broker stop — returns a FetchResp with exactly one zero-record group
+per requested entry, in request order. At-tail is a normal answer, not an
+error.
+
+**Read-deadline rule (normative).** A client's read timeout for a fetch
+response MUST exceed the `maxWaitMs` it requested. The broker legally parks
+the response for up to `maxWait` (≤ 30 s) and arms its own write deadline
+only AFTER dispatch — it will never write early. A client with a fixed 5 s
+read timeout long-polling with `maxWaitMs = 30000` kills its connection on
+every empty poll.
 
 ## 9. Consumer groups
 
-*(written in the behavior pass — row 3)*
+**The control connection IS liveness.** The connection a member joined on
+is its control connection; the broker binds the membership to it. Dropping
+it is IMMEDIATE member death — generation bump and rebalance — not a
+wait-for-timeout (`internal/broker/server.go` teardown,
+`internal/group/coordinator.go` ConnClosed).
+
+**Timing.** The broker sweeps membership every 100 ms and declares a member
+dead after 2 s without liveness evidence (heartbeat or in-flight commit);
+the intended client cadence is a heartbeat every 500 ms
+(`internal/group/coordinator.go` defaults; the obligation is restated in
+§12).
+
+**Generations and range assignment.** Every membership event — join,
+leave, death — bumps the group generation and IMMEDIATELY re-assigns the
+topic's partitions as contiguous ranges over the sorted member IDs. There
+is no join window: each event rebalances at once.
+
+**Join carries state.** JoinGroupResp returns the member's identity,
+the current generation, and its assignment WITH the committed next-to-read
+offset per partition — the whole resume state in one round; there is no
+separate offset-fetch message.
+
+**REJOIN is a LEVEL, not an event.** HeartbeatResp flags bit0 is set WHILE
+the member's joined generation trails the group's, on every heartbeat until
+the member re-joins. The required response is a new JoinGroup on the SAME
+control connection.
+
+**Heartbeats are EXEMPT from the generation fence.** A heartbeat carrying a
+stale generation still refreshes liveness and gets a normal HeartbeatResp
+(with REJOIN set); only an unknown member errors (13). Fencing heartbeats
+would make REJOIN undeliverable and falsely sweep live members
+mid-rebalance.
+
+**Serve-time fencing, pinned precedence.** GroupFetch and CommitOffsets
+are fenced at serve time against the member's liveness and generation, and
+the precedence is pinned: UNKNOWN_MEMBER (13) before STALE_GENERATION (12)
+— not-live always wins (`internal/group/coordinator.go`).
+
+**The 12-vs-13 split (normative — a client implements these DIFFERENTLY):**
+
+- **13 UNKNOWN_MEMBER — the identity is gone** (swept, disconnected, or
+  never known). Recover with a fresh JoinGroup: the broker mints a NEW
+  memberID, bumps the generation, and rebalances the whole group.
+- **12 STALE_GENERATION — the member is live but its generation is
+  outdated.** Recover with a re-JoinGroup on the SAME control connection:
+  the broker returns the SAME memberID and the member ADOPTS the current
+  generation — NO bump, no group-wide disturbance — then reissue the
+  fenced request.
+- Either code on a fetch means re-join then reissue. Neither is fatal.
+
+**A parked GroupFetch during a rebalance is race-dependent — documented as
+such.** If data arrives while the group rebalances under a parked
+GroupFetch, the wake re-fences and the fetch returns 12; if the park
+instead ends by timeout or broker stop, it returns the empty-at-timeout
+shape WITHOUT re-fencing. The same rebalance can therefore surface as
+either answer; a client must handle both (re-join on 12, notice REJOIN via
+heartbeat after an empty poll).
+
+**Commits.** A CommitOffsets is processed as: fence (13 before 12) → merge
+the entries onto the group's CURRENT committed map → atomic write of the
+group's commit file BEFORE the ack → re-fence at install (a member fenced
+mid-write gets 12/13 and NO ack, and nothing is installed). Committing any
+partition outside the member's current assignment is STALE_GENERATION.
+Positions are next-to-read (§5, CommitOffsets).
 
 ## 10. Limits
 
@@ -381,12 +543,71 @@ Defaults (not caps): fetch `maxWaitMs = 0` means 5,000 ms
 
 ## 11. Durability semantics
 
-*(written in the behavior pass — row 3)*
+**What a produce ack means.** ProduceResp is sent only after the record is
+appended to the partition's log, fsynced, and covered by the durable
+frontier's own atomic write — append → fsync → frontier → ack
+(`internal/storage/partition.go`). An acked record survives a crash.
+
+**Reads are capped at the durable frontier.** No fetch response ever
+carries a record that is not fsync-covered — a consumer cannot observe
+data that a crash could take back, so there are no phantom reads to
+handle.
+
+**Group-commit window.** The broker batches appends per partition in a
+5 ms window (`flushWindow`, `internal/storage/partition.go`), fsyncing a
+batch at a time; produce-ack latency floors at that window.
+
+**Commit acks.** A CommitOffsetsResp likewise means the group's commit
+file was atomically written first (§9) — an acked commit survives a crash,
+and a rejoining member resumes from exactly the committed next-to-read
+positions.
+
+**Delivery is at-least-once.** Duplicates are possible — a crash after
+append but before the ack, or a rebalance between processing and commit,
+re-delivers records. Loss of acked data is not. Consumers must be
+idempotent or deduplicate by (partition, offset).
+
+**Platform caveat** (this sentence is quoted verbatim from
+`cmd/bench/report.go`, the single wording authority — the README carries
+the same sentence):
+"durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)".
 
 ## 12. Normative client obligations vs informative notes
 
-*(written in the behavior pass — row 3)*
+The broker enforces the normative list below by LIVENESS and FENCING, not
+by protocol errors naming the violation — a client that heartbeats too
+slowly is swept, not lectured. "Works with my client" is not conformance;
+these are:
+
+- **Heartbeat cadence:** send a Heartbeat at most every 500 ms per member
+  against the 2 s session window (§9). Slower cadences race the sweeper.
+- **Re-JoinGroup on REJOIN:** the HeartbeatResp bit0 level (§9) obligates a
+  re-join on the same control connection; ignoring it strands the member on
+  a stale generation.
+- **The 12-vs-13 split, implemented differently:** 13 → fresh join (new
+  identity, group-wide rebalance); 12 → re-join adopting the current
+  generation, then reissue; either on a fetch = re-join + reissue, never
+  fatal (§9).
+- **The read-deadline rule:** a fetch read timeout MUST exceed the
+  requested maxWaitMs (§8).
+
+*Informative* — the shipped client's choices, carrying no obligation: its
+Producer and Consumer never auto-reconnect (an idle-reclaimed connection
+surfaces EOF/reset and the caller redials); its GroupConsumer's heartbeat
+goroutine only RECORDS a rejoin-needed condition and Poll re-joins lazily,
+redialing its fetch connection after idle reclaim.
 
 ## 13. What this protocol does NOT have
 
-*(written in the behavior pass — row 3)*
+- **No partition resize.** Partition count is fixed at creation; this
+  message set contains no resize operation. (Machine-checked: the §4 table
+  is diffed against the implemented set, and the diff test additionally
+  rejects any documented type name matching the resize family.)
+- **No topic delete.** Topics, once created, exist for the broker's
+  lifetime; there is no delete or retention message.
+- **No auth, no TLS.** Plain TCP. The broker binds loopback by default;
+  exposing the port exposes an unauthenticated protocol.
+- **No Kafka compatibility.** The concepts are Kafka-style; the wire format
+  is NOT Kafka's and no Kafka client can speak it.
+- **No version negotiation.** Version 1 is the only version; message types
+  and error codes are add-only and never renumbered (§1).

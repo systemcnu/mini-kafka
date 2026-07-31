@@ -19,3 +19,7 @@ $ go test ./internal/wire -run TestProtocolDoc -count=1
 FAIL
 FAIL	github.com/systemcnu/mini-kafka/internal/wire	0.239s
 FAIL
+
+== GREEN (end of row 3): tables ≡ registries, all prose cells non-empty, leg D satisfied ==
+$ go test ./internal/wire -run TestProtocolDoc -count=1
+ok  	github.com/systemcnu/mini-kafka/internal/wire	0.246s
