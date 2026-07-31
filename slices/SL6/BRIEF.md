@@ -44,7 +44,7 @@ And the doc-audit half of the last open "partial proof" — showing the document
 
 ## How this was checked
 
-2-seat design review (one different-model): **19 findings, 2 independent convergences, all integrated** — the read-timeout rule, the undercounted echo lines, a table grammar pinned so strictly that stray prose is a test failure. Builder: red-before-green receipted (doc absent → red · tables incomplete → red with counts named), plus the honest STOP on the wrong audit command. Independent verifier — not the builder: three consecutive full-suite race runs green, all six sabotage rows red/restored/green under its own hands, nine prose-vs-code checks clean, the cold read above. Integrator: every gate re-run bare, own exit sabotage, audits receipted, code map regenerated; the exit push arms six named CI jobs (seven check runs — build-smoke twice, Linux and macOS).
+2-seat design review (one different-model): **19 findings, 2 independent convergences, all integrated** — the read-timeout rule, the undercounted echo lines, a table grammar pinned so strictly that stray prose is a test failure. Builder: red-before-green receipted (doc absent → red · tables incomplete → red with counts named), plus the honest STOP on the wrong audit command. Independent verifier — not the builder: three consecutive full-suite race runs green, all six sabotage rows red/restored/green under its own hands, nine prose-vs-code checks clean, the cold read above. Integrator: every gate re-run bare, own exit sabotage, audits receipted, code map regenerated; the exit push ran ALL six named CI jobs green on the public repo — seven check runs, build-smoke on both Linux and macOS for the first time (run receipt in docs/receipts/sl6-audits.txt).
 
 ## Status + what you do now
 

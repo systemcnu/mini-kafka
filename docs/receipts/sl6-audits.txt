@@ -98,3 +98,17 @@ RESULT: zero MISSING across all 10 real packages; internal/e2e test-only, exempt
 
 == REDACTION CHECK (integrator, pattern held outside the repo) ==
 git grep of the scrubbed registration address across the tracked tree: files with matches = 0 (bar: 0)
+
+== INTEGRATOR REFRESH — scenario K push evidence, 2026-07-31 ==
+Push c57a631..ec7c083 -> https://github.com/systemcnu/mini-kafka/actions/runs/30651152980
+Conclusion: success. Seven check runs across six jobs, all green:
+  test: success
+  build-smoke (macos-latest): success
+  demo-timing: success
+  protocol-doc: success
+  vet-staticcheck: success
+  build-smoke (ubuntu-latest): success
+  stdlib-audit: success
+OPS-1 discharged: build-smoke green on BOTH ubuntu-latest and macos-latest (first Linux binary smoke in this repo's CI).
+OPS-2 at HEAD:
+completed	success	SL6 exit: BRIEF (baked), code map 138/138, STATUS — built + verified,…	ci	main	push	30651152980	1m20s	2026-07-31T17:26:11Z
