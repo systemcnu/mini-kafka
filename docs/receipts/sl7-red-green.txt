@@ -1,0 +1,94 @@
+SL7 red-before-green receipt (PLAN §Red) — captured at end of PLAN row 1 (skeleton + all six test files), 2026-07-31
+Six focused runs, one per test file, against the row-1 skeleton: each RED verbatim below.
+
+== RED 1/6 server_test (routeless skeleton) ==
+--- FAIL: TestRoutes (0.00s)
+    server_test.go:33: GET /feed: got 404, want 200 with the JSON feed
+--- FAIL: TestBind (0.00s)
+    server_test.go:80: listenAddr(""): got "", want "127.0.0.1:8080" (local runs stay loopback, NFR-4)
+    server_test.go:83: listenAddr("10000"): got "", want "0.0.0.0:10000" (hosted bind only under the platform's PORT signal)
+--- FAIL: TestTimeouts (0.00s)
+    server_test.go:101: http.Server.ReadHeaderTimeout = 0s — all four timeouts must be non-zero (§H)
+    server_test.go:101: http.Server.ReadTimeout = 0s — all four timeouts must be non-zero (§H)
+    server_test.go:101: http.Server.WriteTimeout = 0s — all four timeouts must be non-zero (§H)
+    server_test.go:101: http.Server.IdleTimeout = 0s — all four timeouts must be non-zero (§H)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	0.286s
+FAIL
+
+== RED 2/6 feed_test (absent handler / zero snapshot) ==
+--- FAIL: TestFeedShape (0.00s)
+    feed_test.go:46: GET /feed: got 404 (body "404 page not found\n") — want 200 carrying the ten-field feed contract (§J)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	0.204s
+FAIL
+
+== RED 3/6 feeder_test (no-op feeder) ==
+--- FAIL: TestBrokerConfig (0.00s)
+    feeder_test.go:39: brokerConfig("/data/dir").Addr = "", want the hard-coded loopback literal "127.0.0.1:0" (D-SL7-1, SHOW-3 by construction)
+--- FAIL: TestFeederLive (15.01s)
+    feeder_test.go:57: feeder produced nothing: produced still 0 after the wait window
+--- FAIL: TestFeederCleanStop (15.00s)
+    feeder_test.go:108: feeder produced nothing before the stop — nothing real was shut down
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	30.218s
+FAIL
+
+== RED 4/6 cap_test (no pause logic) ==
+--- FAIL: TestPlateau (60.00s)
+    cap_test.go:69: status never flipped to paused-at-cap: dir kept growing past the 64 KiB test cap (no pause logic)
+--- FAIL: TestFreshBoot (15.02s)
+    cap_test.go:111: first boot produced nothing
+--- FAIL: TestWriteFailedPause (15.00s)
+    cap_test.go:159: a WRITE_FAILED produce never flipped status to paused-at-cap (D-SL7-4's defense-in-depth leg)
+--- FAIL: TestCapEnv (0.00s)
+    cap_test.go:191: capBytesFromEnv("") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("garbage") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("12.5") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("-3") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("0") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("200") = 0, want 209715200
+    cap_test.go:191: capBytesFromEnv("50") = 0, want 52428800
+    cap_test.go:191: capBytesFromEnv("1") = 0, want 1048576
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	90.230s
+FAIL
+
+== RED 5/6 page_test (placeholder page) ==
+--- FAIL: TestPageServed (0.00s)
+    page_test.go:18: GET /: got 404, want 200 with the embedded page
+--- FAIL: TestPageStates (0.00s)
+    page_test.go:45: page.html missing marker "\"connecting\"" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "\"live\"" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "\"paused-at-cap\"" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "feed unreachable" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "restart" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "self-driving" — the four states + watch-only copy, §P
+    page_test.go:45: page.html missing marker "no way to write" — the four states + watch-only copy, §P
+--- FAIL: TestPageConstant (0.00s)
+    page_test.go:54: page.html missing the 10 s poll constant 10000 (DD-23, §P)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	0.272s
+FAIL
+
+== RED 6/6 concurrent_test (hammered skeleton) ==
+--- FAIL: TestConcurrentLoad (0.00s)
+    concurrent_test.go:86: worker 0 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 12 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 6 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 7 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 10 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 15 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 13 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 1 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 9 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 11 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 4 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 5 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 14 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 8 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 2 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+    concurrent_test.go:86: worker 3 GET /feed: status 404 (body "404 page not found\n") — every response must be 200 under load (§S)
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	0.202s
+FAIL
