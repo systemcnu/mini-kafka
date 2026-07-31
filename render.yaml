@@ -1,0 +1,11 @@
+services:
+  - type: web
+    runtime: go
+    name: mini-kafka-showcase
+    plan: free
+    buildCommand: go build -o showcase ./cmd/showcase
+    startCommand: ./showcase
+    autoDeploy: false
+    envVars:
+      - key: SHOWCASE_DISK_CAP_MB
+        value: "200"
