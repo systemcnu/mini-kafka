@@ -53,18 +53,23 @@ as members come and go, and resumes each member from its group's committed offse
   resumes from exactly the committed offsets. Dead members (missed
   heartbeats or dropped control connections) are fenced by generation —
   a stale member's commit can never clobber the group.
-- macOS caveat: `fsync` on macOS may not flush the drive cache
-  (`F_FULLFSYNC` exists but is much slower and has no Linux equivalent);
-  durability claims are qualified by that platform limit.
+- Delivery is at-least-once: duplicates are possible after crashes and
+  rebalances, loss of acked data is not.
+- durability is platform-qualified: on macOS Go's Sync is F_FULLFSYNC (drive-cache barrier — stronger and slower); on Linux plain fsync (DD-7, corrected)
 
 ## Limitations (plainly)
 
 - Local only: the broker binds 127.0.0.1 by default and there is no auth,
-  TLS, or replication. One broker, one machine.
+  TLS, or replication — pointing `--addr` anywhere else exposes an
+  unauthenticated protocol to that network. One broker, one machine.
 - In-memory offset index grows with message count — fine at demo scale.
 - No retention or compaction: partitions are single append-only files.
 
 ## Development
+
+The complete wire contract lives in [docs/PROTOCOL.md](docs/PROTOCOL.md) —
+implement your own client from it; its two registry tables are
+machine-diffed against `internal/wire` on every test run and in CI.
 
 `scripts/checks.sh` runs the full local battery: build, vet, gofmt check,
 stdlib audit, tests, and a `GOOS=linux` cross-compile.
