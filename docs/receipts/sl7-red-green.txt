@@ -170,3 +170,7 @@ Witnessed sabotage: broker literal -> 0.0.0.0:0 -> TestBrokerConfig FAIL naming 
 contract (D-SL7-1/SHOW-3) -> restored -> ok. Full suite: go test ./... -race -count=1 -> 12
 packages ok, bare. Verifier PASS (4/4 sabotage incl. 28 race warnings on the sync-removal leg).
 Scrub battery (patterns held outside the repo): files matching = 0 / 0 / 1 (bar: 0 each).
+CORRECTION: the ID-slug line above read 1 due to a proxy-pattern defect — the unanchored
+pattern matched the substring own-… inside the ordinary words teardown-resilient and
+teardown-criterion in slices/SL7/DESIGN.md. Word-boundary-anchored re-run: files matching
+= 0. No platform identifier exists anywhere in the tree; nothing sensitive was pushed.
