@@ -6,3 +6,16 @@ $ go test ./internal/wire -run TestProtocolDoc -count=1
 FAIL
 FAIL	github.com/systemcnu/mini-kafka/internal/wire	0.290s
 FAIL
+
+== RED 2 (mid-row 2): markers + grammar comment + header/separator in place, data rows incomplete — count-inequality names the shortfall ==
+$ go test ./internal/wire -run TestProtocolDoc -count=1
+--- FAIL: TestProtocolDoc (0.00s)
+    --- FAIL: TestProtocolDoc/legA_codes_table_≡_errors.go_≡_AllCodes (0.00s)
+        protocoldoc_test.go:69: codes table has 4 rows, registry has 13
+    --- FAIL: TestProtocolDoc/legB_types_table_≡_package-wide_Type_consts (0.00s)
+        protocoldoc_test.go:119: types table has 3 rows, registry has 18
+    --- FAIL: TestProtocolDoc/legD_no_resize_operation_documented_(TOP-2) (0.00s)
+        protocoldoc_test.go:175: docs/PROTOCOL.md lacks the fixed-partition statement (expected the phrase "no resize")
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/wire	0.239s
+FAIL
