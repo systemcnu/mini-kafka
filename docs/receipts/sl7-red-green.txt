@@ -112,3 +112,18 @@ FAIL
 --- PASS: TestTimeouts (0.00s)
 PASS
 ok  	github.com/systemcnu/mini-kafka/cmd/showcase	7.744s
+
+== GREEN (PLAN row 12): full suite under -race ==
+ok  	github.com/systemcnu/mini-kafka/client	16.257s
+ok  	github.com/systemcnu/mini-kafka/cmd/bench	6.291s
+ok  	github.com/systemcnu/mini-kafka/cmd/demo	24.698s
+?   	github.com/systemcnu/mini-kafka/cmd/minikafka	[no test files]
+?   	github.com/systemcnu/mini-kafka/cmd/mk	[no test files]
+ok  	github.com/systemcnu/mini-kafka/cmd/showcase	11.105s
+ok  	github.com/systemcnu/mini-kafka/internal/broker	25.557s
+ok  	github.com/systemcnu/mini-kafka/internal/e2e	16.939s
+ok  	github.com/systemcnu/mini-kafka/internal/group	8.085s
+ok  	github.com/systemcnu/mini-kafka/internal/storage	16.997s
+ok  	github.com/systemcnu/mini-kafka/internal/storage/storagetest	2.948s
+ok  	github.com/systemcnu/mini-kafka/internal/wire	2.571s
+test-function count by command (grep -rn "^func Test" --include=*_test.go . | wc -l): 163 (baseline 147 + 16 new showcase tests)
