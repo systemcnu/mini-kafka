@@ -1,1 +1,171 @@
-<!-- placeholder: PLAN row 1 skeleton — the real §P page lands at row 6 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mini-kafka — live showcase</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --edge: #262b36; --ink: #d7dce5;
+    --dim: #8a93a5; --ok: #4cc38a; --warn: #e5b567; --bad: #e26d5c; --acc: #6ea8fe;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  h1 span { color: var(--acc); }
+  .sub { color: var(--dim); margin: 0 0 1rem; }
+  .watchonly { color: var(--dim); font-size: .85rem; margin: .25rem 0 1.25rem; }
+  #state {
+    display: inline-block; padding: .15rem .6rem; border-radius: 999px;
+    border: 1px solid var(--edge); font-size: .85rem; margin-bottom: 1rem;
+  }
+  #state.connecting { color: var(--warn); }
+  #state.live { color: var(--ok); }
+  #state.paused { color: var(--warn); }
+  #state.unreachable { color: var(--bad); }
+  #banner {
+    display: none; border: 1px solid var(--warn); border-radius: .5rem;
+    padding: .6rem .9rem; margin: 0 0 1rem; color: var(--warn);
+  }
+  #narration {
+    display: none; border: 1px solid var(--bad); border-radius: .5rem;
+    padding: .6rem .9rem; margin: 0 0 1rem; color: var(--bad);
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+  .card { background: var(--panel); border: 1px solid var(--edge); border-radius: .5rem; padding: .6rem .9rem; }
+  .card .k { color: var(--dim); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+  .card .v { font-size: 1.15rem; margin-top: .15rem; }
+  .cols { display: grid; grid-template-columns: 1fr 2fr; gap: .75rem; }
+  @media (max-width: 44rem) { .cols { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: right; padding: .25rem .5rem; border-bottom: 1px solid var(--edge); }
+  th { color: var(--dim); font-weight: normal; }
+  #recent { list-style: none; margin: 0; padding: 0; font-size: .85rem; max-height: 24rem; overflow-y: auto; }
+  #recent li { padding: .15rem .5rem; border-bottom: 1px solid var(--edge); }
+  #recent .p { color: var(--acc); }
+  #recent .o { color: var(--dim); }
+  .foot { color: var(--dim); font-size: .8rem; margin-top: 1.25rem; }
+  a { color: var(--acc); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span>mini-kafka</span> — live showcase</h1>
+  <p class="sub">one broker on loopback · one producer · one group consumer · topic showcase&times;4 · ~2 msg/s</p>
+  <p class="watchonly">you are watching a self-driving instance; there is no way to write to it.</p>
+
+  <div id="state" class="connecting">connecting&hellip;</div>
+  <div id="banner">paused-at-cap: the disk cap was reached, so the producer stopped — reads keep serving. a restart resets the ephemeral disk and un-pauses.</div>
+  <div id="narration">feed unreachable — the instance may be restarting; free instances restart at any time. this page keeps polling.</div>
+
+  <div class="grid">
+    <div class="card"><div class="k">produced</div><div class="v" id="produced">&ndash;</div></div>
+    <div class="card"><div class="k">uptime</div><div class="v" id="uptime">&ndash;</div></div>
+    <div class="card"><div class="k">disk</div><div class="v" id="disk">&ndash;</div></div>
+    <div class="card"><div class="k">heap</div><div class="v" id="mem">&ndash;</div></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <div class="k">partitions (next offset) &middot; assignment <span id="assignment">&ndash;</span></div>
+      <table>
+        <thead><tr><th>partition</th><th>nextOffset</th></tr></thead>
+        <tbody id="partitions"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="k">recent records (ring of 50, oldest first)</div>
+      <ul id="recent"></ul>
+    </div>
+  </div>
+
+  <p class="foot">
+    the feed refreshes every 10 s &middot; started <span id="startedAt">&ndash;</span> &middot;
+    source: <a href="https://github.com/systemcnu/mini-kafka">github.com/systemcnu/mini-kafka</a> &middot;
+    run it yourself: <code>go run ./cmd/showcase</code>
+  </p>
+</div>
+
+<script>
+"use strict";
+// States: "connecting" (before the first /feed succeeds) -> "live" ->
+// "paused-at-cap" (honest banner, feed still rendered) -> "feed
+// unreachable" (the instance may be restarting - narrated, kept polling).
+var POLL_MS = 10000; // DD-23's 10 s poll - also what keeps a watched instance awake
+var stateEl = document.getElementById("state");
+var bannerEl = document.getElementById("banner");
+var narrationEl = document.getElementById("narration");
+
+function setState(name) {
+  if (name === "connecting") {
+    stateEl.className = "connecting"; stateEl.textContent = "connecting…";
+  } else if (name === "live") {
+    stateEl.className = "live"; stateEl.textContent = "live";
+  } else if (name === "paused-at-cap") {
+    stateEl.className = "paused"; stateEl.textContent = "paused-at-cap";
+  } else {
+    stateEl.className = "unreachable"; stateEl.textContent = "feed unreachable";
+  }
+  bannerEl.style.display = name === "paused-at-cap" ? "block" : "none";
+  narrationEl.style.display = name === "unreachable" ? "block" : "none";
+}
+
+function fmtBytes(n) {
+  if (n >= 1048576) { return (n / 1048576).toFixed(1) + " MiB"; }
+  if (n >= 1024) { return (n / 1024).toFixed(1) + " KiB"; }
+  return n + " B";
+}
+
+function fmtUptime(s) {
+  var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  if (d > 0) { return d + "d " + h + "h " + m + "m"; }
+  if (h > 0) { return h + "h " + m + "m " + (s % 60) + "s"; }
+  return m + "m " + (s % 60) + "s";
+}
+
+function render(feed) {
+  setState(feed.status === "paused-at-cap" ? "paused-at-cap" : "live");
+  document.getElementById("produced").textContent = feed.produced;
+  document.getElementById("uptime").textContent = fmtUptime(feed.uptimeSeconds);
+  document.getElementById("disk").textContent = fmtBytes(feed.diskBytes) + " / " + fmtBytes(feed.diskCapBytes);
+  document.getElementById("mem").textContent = fmtBytes(feed.memBytes);
+  document.getElementById("assignment").textContent = "[" + feed.assignment.join(" ") + "]";
+  document.getElementById("startedAt").textContent = feed.startedAt;
+
+  var rows = "";
+  feed.partitions.forEach(function (p) {
+    rows += "<tr><td>" + p.partition + "</td><td>" + p.nextOffset + "</td></tr>";
+  });
+  document.getElementById("partitions").innerHTML = rows;
+
+  var recent = document.getElementById("recent");
+  recent.textContent = "";
+  feed.recent.forEach(function (r) {
+    var li = document.createElement("li");
+    var p = document.createElement("span"); p.className = "p"; p.textContent = "p" + r.partition;
+    var o = document.createElement("span"); o.className = "o"; o.textContent = " @" + r.offset + " ";
+    li.appendChild(p); li.appendChild(o); li.appendChild(document.createTextNode(r.payload));
+    recent.appendChild(li);
+  });
+  recent.scrollTop = recent.scrollHeight;
+}
+
+function tick() {
+  fetch("/feed").then(function (resp) {
+    if (!resp.ok) { throw new Error("status " + resp.status); }
+    return resp.json();
+  }).then(render).catch(function () {
+    setState("unreachable");
+  });
+}
+
+setState("connecting");
+tick();
+setInterval(tick, POLL_MS);
+</script>
+</body>
+</html>
