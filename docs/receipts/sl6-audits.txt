@@ -1,0 +1,78 @@
+== SL6 final audits (D-SL6-8) — captured 2026-07-31T16:59:14Z at 60da4c8 ==
+
+-- PROT-2: only client (+ broker-hosting in demo/bench per D-SL5-1/D-SL3-1 precedent) --
+$ go list -deps ./cmd/demo ./cmd/bench ./cmd/mk | grep mini-kafka
+github.com/systemcnu/mini-kafka/internal/wire
+github.com/systemcnu/mini-kafka/client
+github.com/systemcnu/mini-kafka/internal/storage
+github.com/systemcnu/mini-kafka/internal/group
+github.com/systemcnu/mini-kafka/internal/broker
+github.com/systemcnu/mini-kafka/cmd/demo
+github.com/systemcnu/mini-kafka/cmd/bench
+github.com/systemcnu/mini-kafka/cmd/mk
+
+   (clarifying sub-audit: mk alone — client-only path, no broker hosting)
+$ go list -deps ./cmd/mk | grep mini-kafka
+github.com/systemcnu/mini-kafka/internal/wire
+github.com/systemcnu/mini-kafka/client
+github.com/systemcnu/mini-kafka/cmd/mk
+
+-- OPS-2: green at HEAD + pins --
+[INTEGRATOR REFRESH AT EXIT: re-run 'gh run list -L1' after the exit push; the line below predates SL6's push]
+$ gh run list -L1
+completed	success	SL5 PASSED at Sri's gate — DD-7 fsync correction accepted as surfaced…	ci	main	push	30645439626	58s	2026-07-31T16:02:12Z
+
+$ grep -n 'go 1.24' go.mod
+3:go 1.24
+
+$ grep -n '1.24.x\|@2025.1.1\|@v[0-9]\|sha256:' .github/workflows/ci.yml scripts/checks.sh
+.github/workflows/ci.yml:12:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:13:      - uses: actions/setup-go@v5
+.github/workflows/ci.yml:15:          go-version: "1.24.x"
+.github/workflows/ci.yml:22:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:23:      - uses: actions/setup-go@v5
+.github/workflows/ci.yml:25:          go-version: "1.24.x"
+.github/workflows/ci.yml:29:      - run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+.github/workflows/ci.yml:35:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:36:      - uses: actions/setup-go@v5
+.github/workflows/ci.yml:38:          go-version: "1.24.x"
+.github/workflows/ci.yml:49:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:50:      - uses: actions/setup-go@v5
+.github/workflows/ci.yml:52:          go-version: "1.24.x"
+.github/workflows/ci.yml:64:  # sha256:46fdd02b6cbcd624a4087ea298e4c8505e5d400c4ee5181e4dd06e2297d647ae
+.github/workflows/ci.yml:68:    container: golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+.github/workflows/ci.yml:70:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:74:          DEMO_TIMING_IMAGE_REF: golang:1.24@sha256:d2d2bc1c84f7e60d7d2438a3836ae7d0c847f4888464e7ec9ba3a1339a1ee804
+.github/workflows/ci.yml:78:      - uses: actions/upload-artifact@v4
+.github/workflows/ci.yml:91:      - uses: actions/checkout@v4
+.github/workflows/ci.yml:92:      - uses: actions/setup-go@v5
+.github/workflows/ci.yml:94:          go-version: "1.24.x"
+scripts/checks.sh:15:go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+
+-- OPS-3: LICENSE + top screen --
+$ test -f LICENSE && echo LICENSE-OK
+LICENSE-OK
+
+-- NFR-1: local equivalent of the stdlib-audit job --
+$ bash scripts/stdlib_audit.sh
+stdlib audit OK
+
+-- NFR-3: package doc-header audit (loud-failure form) --
+$ go list ./... | while read -r p; do go doc "$p" | grep -q '^Package ' || { echo "MISSING doc header: $p"; exit 1; }; done && echo ALL-DOCUMENTED
+MISSING doc header: github.com/systemcnu/mini-kafka/cmd/bench
+
+!! STOP NOTE (builder, D-SL6-10): the pinned NFR-3 command FAILED on this tree — output above is its verbatim result (exit 1).
+!! Diagnosis (NOT the pinned audit — diagnostic breakdown only):
+!!   - grep -q '^Package ' encodes ONE of Go's two doc-header conventions; the four cmd/* main packages
+!!     use the standard 'Command <name> ...' form (go doc output verified for all four — each documented).
+!!   - internal/e2e is test-only (only _test.go files): 'go doc' itself errors, nothing non-test to document.
+!!   - internal/storage/storagetest HAS a real doc header ('Fault-scripted wrappers over the storage seams...')
+!!     but it starts with neither 'Package ' nor 'Command '.
+!! Per-package result of the pinned grep: OK client, internal/broker, internal/group, internal/storage,
+!!   internal/wire; MISS cmd/bench, cmd/demo, cmd/minikafka, cmd/mk, internal/e2e, internal/storage/storagetest.
+!! Ending ALL-DOCUMENTED requires either .go edits (doc headers) — forbidden this slice (D-SL6-10) — or an
+!! amended audit command; both are design-level. Left RED for the integrator; no workaround applied.
+!! vet+staticcheck (NFR-3's other half) are covered by scripts/checks.sh in row 8.
+
+-- OPS-1: matrix build+smoke green on BOTH platforms --
+[INTEGRATOR CAPTURE AT EXIT: push-evidence — six jobs / seven check runs (build-smoke x2) at the new HEAD]
