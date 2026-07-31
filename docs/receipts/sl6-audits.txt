@@ -95,3 +95,6 @@ github.com/systemcnu/mini-kafka/internal/wire DOC-OK
 $ go list -f '{{if not .GoFiles}}{{.ImportPath}} TEST-ONLY-exempt{{end}}' ./...
 github.com/systemcnu/mini-kafka/internal/e2e TEST-ONLY-exempt
 RESULT: zero MISSING across all 10 real packages; internal/e2e test-only, exempt. NFR-3 discharged.
+
+== REDACTION CHECK (integrator, pattern held outside the repo) ==
+git grep of the scrubbed registration address across the tracked tree: files with matches = 0 (bar: 0)

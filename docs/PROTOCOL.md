@@ -159,6 +159,12 @@ before it. Source of truth: `internal/wire/messages.go`.
 | partition | u32 | target partition, `0 ≤ partition <` the topic's count |
 | payload | blob | the record; at most 1 MiB (§10), rejected BEFORE anything is written |
 
+Validation order (normative — a reimplementing broker must reject in this
+order): body decode → MALFORMED · name rule → INVALID_NAME · payload over
+1 MiB → MSG_TOO_LARGE, checked BEFORE topic resolution (an oversized
+payload to a nonexistent topic gets MSG_TOO_LARGE, not UNKNOWN_TOPIC) ·
+topic/partition resolution → UNKNOWN_TOPIC / BAD_PARTITION.
+
 Answered by ProduceResp only after the record is written, fsynced, and
 covered by the durable frontier (§11).
 
@@ -417,7 +423,9 @@ served partially:
    the whole frame).
 
 Defaults applied after validation: `maxWaitMs = 0` means 5,000 ms;
-`maxBytes = 0` means 1 MiB.
+`maxBytes = 0` means 1 MiB. There is NO zero-wait encoding — the smallest
+real wait is `maxWaitMs = 1`; a client wanting an immediate answer sends
+that, never 0.
 
 **Budget accounting (normative interop contract).** Records are served
 across the request's entries in request order against ONE shared `maxBytes`
@@ -460,12 +468,16 @@ wait-for-timeout (`internal/broker/server.go` teardown,
 dead after 2 s without liveness evidence (heartbeat or in-flight commit);
 the intended client cadence is a heartbeat every 500 ms
 (`internal/group/coordinator.go` defaults; the obligation is restated in
-§12).
+§12). Fetch requests carry NO liveness meaning — a member that only
+fetches and never heartbeats is swept.
 
 **Generations and range assignment.** Every membership event — join,
 leave, death — bumps the group generation and IMMEDIATELY re-assigns the
-topic's partitions as contiguous ranges over the sorted member IDs. There
-is no join window: each event rebalances at once.
+topic's partitions as contiguous ranges over the sorted member IDs: with
+P partitions and N members each member gets ⌊P/N⌋, the FIRST `P mod N`
+members in sorted-ID order get one extra, and ranges are handed out
+contiguously in that same order. There is no join window: each event
+rebalances at once.
 
 **Join carries state.** JoinGroupResp returns the member's identity,
 the current generation, and its assignment WITH the committed next-to-read

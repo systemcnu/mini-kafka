@@ -23,3 +23,31 @@ FAIL
 == GREEN (end of row 3): tables ≡ registries, all prose cells non-empty, leg D satisfied ==
 $ go test ./internal/wire -run TestProtocolDoc -count=1
 ok  	github.com/systemcnu/mini-kafka/internal/wire	0.246s
+
+== VERIFIER SABOTAGE (independent verifier, 2026-07-31) — all six §S rows re-run by the verifier's own hands; each: mutate docs/PROTOCOL.md -> focused test RED (key line below, teed from the real run) -> git checkout -> GREEN ==
+$ go test ./internal/wire -run TestProtocolDoc -count=1   (after each mutation; green re-run after each restore: ok ... internal/wire)
+-- (1) deleted codes row 9 FETCH_TOO_WIDE:
+protocoldoc_test.go:69: codes table has 12 rows, registry has 13
+-- (2) added fictitious ERR_RESIZE_TOPIC types row (legs B and D both fired):
+protocoldoc_test.go:119: types table has 19 rows, registry has 18
+protocoldoc_test.go:171: documented type ERR_RESIZE_TOPIC matches a resize-family name — TOP-2 forbids a resize operation
+-- (3) renumbered types row 17 GroupFetch -> 18:
+protocoldoc_test.go:136: declared type TypeGroupFetch = 17 has no doc row
+protocoldoc_test.go:145: doc types table lists 18 (GroupFetch), which no declared constant carries
+-- (4) blanked codes row 2 TOPIC_EXISTS meaning cell:
+protocoldoc_test.go:154: codes row 2 (TOPIC_EXISTS): "meaning" cell is empty — a row that names a code but explains nothing is a failure
+-- (5) stray prose line inside the codes markers:
+protocoldoc_test.go:46: illegal line inside the registry:codes block (legal classes: blank, the grammar comment, one header, one separator, integer-keyed data rows): "This stray prose line is verifier sabotage."
+-- (6) duplicated codes row 5 MSG_TOO_LARGE:
+protocoldoc_test.go:69: codes table has 14 rows, registry has 13
+All six reds observed with the named reason; docs/PROTOCOL.md restored via git checkout after each; focused test GREEN after every restore (exit 0).
+
+== INTEGRATOR EXIT SABOTAGE (own hands, bare runs), 2026-07-31 ==
+Injected '| 99 | ERR_RESIZE_TOPIC | fictitious | sabotage |' before registry:codes:end →
+  --- FAIL: TestProtocolDoc/legA_codes_table_≡_errors.go_≡_AllCodes
+      protocoldoc_test.go:69: codes table has 14 rows, registry has 13
+Removed the line → ok github.com/systemcnu/mini-kafka/internal/wire (bare run, exit 0).
+Integrator terminal gates, all bare: go test ./... -race -count=1 → 11 packages ok ·
+scripts/checks.sh → ALL CHECKS GREEN · go test ./cmd/bench → ok (markers byte-identical).
+Post-verifier doc additions (cold-read LOW-1/LOW-2): produce validation order, no-zero-wait
+encoding, fetches-carry-no-liveness, uneven range split — focused test green after each.
