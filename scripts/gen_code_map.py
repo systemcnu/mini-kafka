@@ -233,10 +233,32 @@ CARDS = [
                 ("cmd/bench/bench_test.go", "cmd/bench/bench_test.go", "file"),
                 ("cmd/bench/render_test.go", "cmd/bench/render_test.go", "file"),
             ]),
+            ("SL6: protocol doc (registry diff · CI two-OS)", [
+                ("internal/wire/protocoldoc_test.go", "internal/wire/protocoldoc_test.go", "file"),
+                (".github/workflows/ci.yml", ".github/workflows/ci.yml", "file"),
+            ]),
             ("fault scripting seam", [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultSyncer", "type"),
+            ]),
+        ],
+    },
+    {
+        "id": "prot", "nick": "the phrasebook", "icon": "\U0001f4dc", "tint": "wire",
+        "file": "docs/PROTOCOL.md · internal/wire/protocoldoc_test.go",
+        "col": 1, "row": 3,
+        "purpose": "The stranger-implementable wire contract (linked from the README): every claim pinned to a named source location, and its two marker-bounded registry tables machine-diffed against the wire package's own source, both directions, on every test run — no bootstrap skip, doc drift is a build failure.",
+        "groups": [
+            ("the contract", [
+                ("docs/PROTOCOL.md", "docs/PROTOCOL.md", "file"),
+            ]),
+            ("the drift gate", [
+                ("internal/wire/protocoldoc_test.go", "TestProtocolDoc", "func"),
+                ("internal/wire/protocoldoc_test.go", "parseRegistryTable", "func"),
+                ("internal/wire/protocoldoc_test.go", "splitCells", "func"),
+                ("internal/wire/protocoldoc_test.go", "declaredTypes", "func"),
+                ("internal/wire/protocoldoc_test.go", "upperSnake", "func"),
             ]),
         ],
     },
