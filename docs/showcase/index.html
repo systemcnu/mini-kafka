@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mini-kafka — showcase</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --edge: #262b36; --ink: #d7dce5;
+    --dim: #8a93a5; --warn: #e5b567; --acc: #6ea8fe;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex; min-height: 100vh; align-items: center; justify-content: center;
+  }
+  .card {
+    max-width: 36rem; background: var(--panel); border: 1px solid var(--edge);
+    border-radius: .6rem; padding: 1.25rem 1.5rem;
+  }
+  h1 { font-size: 1.1rem; margin: 0 0 .75rem; }
+  h1 span { color: var(--acc); }
+  p { margin: .5rem 0; }
+  .dim { color: var(--dim); }
+  .warn { color: var(--warn); }
+  #elapsed { color: var(--acc); }
+  code { background: var(--bg); border: 1px solid var(--edge); border-radius: .3rem; padding: .05rem .35rem; }
+  a { color: var(--acc); }
+  #waking, #fallback { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1><span>mini-kafka</span> — live showcase</h1>
+
+  <div id="waking">
+    <p class="warn">waking the showcase — free-tier instances sleep when idle; first wake takes about a minute.</p>
+    <p class="dim">this page polls the instance and swaps in the live view the moment it answers.</p>
+    <p>elapsed: <span id="elapsed">0 s</span></p>
+  </div>
+
+  <div id="fallback">
+    <p class="warn">the showcase is not currently hosted.</p>
+    <p>run it yourself: <code>go run ./cmd/showcase</code> then open <code>127.0.0.1:8080</code></p>
+    <p class="dim">source: <a href="https://github.com/systemcnu/mini-kafka">github.com/systemcnu/mini-kafka</a></p>
+  </div>
+</div>
+
+<script>
+"use strict";
+var RENDER_URL = "RENDER_URL_TBD"; // the ONE placeholder — the real hostname lands in ONE post-checkpoint commit (ledger 12)
+
+var POLL_MS = 5000;       // 5 s — well under the ~1-min wake it watches (feasibility receipt)
+var FETCH_TIMEOUT_MS = 4000;
+var DEGRADE_MS = 300000;  // 5 min = 5x the stated wake: past this, not-hosted-or-broken — the fallback is honest either way
+
+var startedAt = Date.now();
+var pollTimer = null, elapsedTimer = null;
+
+function show(id) {
+  document.getElementById("waking").style.display = id === "waking" ? "block" : "none";
+  document.getElementById("fallback").style.display = id === "fallback" ? "block" : "none";
+}
+
+function showFallback() {
+  if (pollTimer !== null) { clearInterval(pollTimer); }
+  if (elapsedTimer !== null) { clearInterval(elapsedTimer); }
+  show("fallback");
+}
+
+// Live means ALL of (D-SL7-6, pinned): the fetch resolved AND response.ok
+// AND the body parses as JSON AND the object carries a "produced" key.
+// A CORS rejection (TypeError), network error, timeout, non-ok status, or
+// unparseable body (the platform's own holding page) ALL count as
+// still-waking — never as live, never as an error state.
+function probe() {
+  if (Date.now() - startedAt > DEGRADE_MS) { showFallback(); return; }
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () { ctrl.abort(); }, FETCH_TIMEOUT_MS);
+  fetch(RENDER_URL + "/feed", { signal: ctrl.signal, mode: "cors" })
+    .then(function (resp) {
+      if (!resp.ok) { throw new Error("status " + resp.status); }
+      return resp.text();
+    })
+    .then(function (body) {
+      var obj = JSON.parse(body);
+      if (obj !== null && typeof obj === "object" && Object.prototype.hasOwnProperty.call(obj, "produced")) {
+        location = RENDER_URL; // first live response: swap-in = redirect (ledger 1)
+        return;
+      }
+      throw new Error("json without a produced key");
+    })
+    .catch(function () { /* still waking — keep polling until the degrade bound */ })
+    .finally(function () { clearTimeout(timer); });
+}
+
+// Short-circuit (D-SL7-6, pinned semantics): until the deploy commit lands
+// a real absolute https URL, the const is a bare placeholder — which would
+// resolve as a RELATIVE url against this very origin, and fetch RESOLVES
+// on a 404, so a naive resolved-means-live predicate would redirect
+// visitors to a broken path. Anything that is not an absolute https URL
+// means "no hostname committed yet": fallback IMMEDIATELY, and NEVER fetch.
+if (RENDER_URL.indexOf("https://") !== 0) {
+  showFallback();
+} else {
+  show("waking");
+  elapsedTimer = setInterval(function () {
+    document.getElementById("elapsed").textContent = Math.floor((Date.now() - startedAt) / 1000) + " s";
+  }, 1000);
+  pollTimer = setInterval(probe, POLL_MS);
+  probe();
+}
+</script>
+</body>
+</html>
