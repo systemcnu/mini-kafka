@@ -87,7 +87,7 @@ func TestBind(t *testing.T) {
 // TestTimeouts pins §H's four non-zero timeouts on the SAME constructor
 // production uses — a zero-valued http.Server is Slowloris-open.
 func TestTimeouts(t *testing.T) {
-	srv := newServer("127.0.0.1:0", newMux(testHolder(t)))
+	srv := newServer(listenAddr(""), newMux(testHolder(t)))
 	for _, c := range []struct {
 		name string
 		d    time.Duration
