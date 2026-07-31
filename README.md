@@ -39,6 +39,22 @@ go build -o bin/mk ./cmd/mk
 as members come and go, and resumes each member from its group's committed offsets.
 `minikafka` stops gracefully on SIGINT/SIGTERM.
 
+## Live showcase
+
+A watch-only, self-driving instance of this broker — producer and group consumer
+running against the real TCP surface, watched from a browser:
+**https://systemcnu.github.io/mini-kafka/showcase/**
+
+The first load can take about a minute while the free instance wakes (free
+instances sleep when idle — the page narrates the wait). Visitors cannot write
+to it: the hosted surface serves exactly one page and one read-only JSON feed.
+
+Teardown criterion: if Render's free tier gains a card requirement, starts
+charging, or the workspace's free instance hours run out — the service is
+deleted, and this link reverts to "not currently hosted".
+
+Run it locally instead: `go run ./cmd/showcase`, then open `127.0.0.1:8080`.
+
 ## What it guarantees today
 
 - A produce is acked only after the record is written, fsynced, and the
