@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -51,7 +52,11 @@ func feedStatusOK(t *testing.T, holder *snapshotHolder) string {
 // TestPlateau is SHOW-4's sustained-run proof at a 64 KiB cap with
 // accelerated seams: the status flips to paused-at-cap, the dir STOPS
 // growing across further walks, produced stops counting, and /feed still
-// serves.
+// serves. Real records flow first; then a filler file dropped into the
+// feeder's OWN data dir stands in for hours of accumulation (durable acks
+// run ~30/s at ~15 B/record here — organic growth to 64 KiB would take
+// minutes) — the walker sums the dir regardless of who wrote the bytes,
+// so the real walk → cap → sticky-pause mechanism is what fires.
 func TestPlateau(t *testing.T) {
 	const capBytes = 64 << 10
 	holder := newSnapshotHolder(capBytes, time.Now())
@@ -66,7 +71,13 @@ func TestPlateau(t *testing.T) {
 	}
 	defer f.stop()
 
-	waitFor(t, 60*time.Second, "status never flipped to paused-at-cap: dir kept growing past the 64 KiB test cap (no pause logic)", func() bool {
+	waitFor(t, 30*time.Second, "feeder never produced real records before the cap test", func() bool {
+		return holder.load().Produced >= 10
+	})
+	if err := os.WriteFile(filepath.Join(f.dir, "filler.bin"), make([]byte, capBytes), 0o644); err != nil {
+		t.Fatalf("writing filler: %v", err)
+	}
+	waitFor(t, 30*time.Second, "status never flipped to paused-at-cap: dir kept growing past the 64 KiB test cap (no pause logic)", func() bool {
 		return holder.load().Status == statusPaused
 	})
 

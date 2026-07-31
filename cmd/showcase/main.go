@@ -11,13 +11,20 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
-// capBytesFromEnv parses SHOWCASE_DISK_CAP_MB; unset, garbage, or
-// non-positive take the 200 MiB default (D-SL7-4). SKELETON (PLAN row 1):
-// inert — row 5 lands the parse.
-func capBytesFromEnv(v string) int64 { _ = v; return 0 }
+// capBytesFromEnv parses SHOWCASE_DISK_CAP_MB (whole MiB); unset,
+// garbage, non-positive, or absurd (> 1 TiB) take the 200 MiB default
+// (D-SL7-4).
+func capBytesFromEnv(v string) int64 {
+	mb, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || mb <= 0 || mb > 1<<20 {
+		mb = defaultCapMiB
+	}
+	return mb << 20
+}
 
 func main() {
 	capBytes := capBytesFromEnv(os.Getenv("SHOWCASE_DISK_CAP_MB"))

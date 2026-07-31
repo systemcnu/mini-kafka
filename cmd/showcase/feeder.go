@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -235,8 +236,15 @@ func (f *feeder) producerLoop() {
 			continue
 		}
 		if _, err := f.prod.Produce(feedTopic, uint32(n%feedPartitions), []byte(fmt.Sprintf("msg-%d", n))); err != nil {
-			// Transient produce errors skip the tick; a stop exits via
-			// stopCh on the next select.
+			var cerr *client.Error
+			if errors.As(err, &cerr) && cerr.Code == client.CodeWriteFailed {
+				// SL1's degrade machinery as defense in depth (D-SL7-4):
+				// the broker refused the append below the cap — same
+				// sticky pause, reads keep serving, never a crash.
+				f.pause()
+			}
+			// Other produce errors skip the tick; a stop exits via stopCh
+			// on the next select.
 			continue
 		}
 		f.mu.Lock()
@@ -309,9 +317,25 @@ func (f *feeder) walkerLoop() {
 		f.mu.Lock()
 		f.state.diskBytes = disk
 		f.state.memBytes = ms.HeapAlloc
+		if disk >= f.cfg.capBytes {
+			// The SHOW-4 disk bound: at or past the cap the sticky pause
+			// fires (ledger 8) — plateau until restart resets the dir.
+			f.state.paused = true
+			f.state.status = statusPaused
+		}
 		f.publishLocked()
 		f.mu.Unlock()
 	}
+}
+
+// pause sets the sticky pause (ledger 8): NEVER cleared — restart is the
+// only un-pause. The consumer and walker keep running; reads keep serving.
+func (f *feeder) pause() {
+	f.mu.Lock()
+	f.state.paused = true
+	f.state.status = statusPaused
+	f.publishLocked()
+	f.mu.Unlock()
 }
 
 // walkDiskBytes sums regular-file sizes under the data dir; a mid-walk
