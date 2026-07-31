@@ -515,6 +515,41 @@ mid-write gets 12/13 and NO ack, and nothing is installed). Committing any
 partition outside the member's current assignment is STALE_GENERATION.
 Positions are next-to-read (§5, CommitOffsets).
 
+**The lifecycle in one picture** — join, assignment, heartbeat/REJOIN,
+re-join adopting the generation, and a fenced late commit:
+
+![Sequence diagram](diagrams/PROTOCOL-d1-27ebd8a3.png)
+
+<details><summary>Diagram source (mermaid — sequence diagram)</summary>
+
+```mermaid
+sequenceDiagram
+    participant A as consumer A (control conn)
+    participant B as consumer B (control conn)
+    participant K as broker coordinator
+
+    A->>K: JoinGroup(g, t)
+    K-->>A: JoinGroupResp — memberID m1, generation 1, all partitions + committed next-to-read offsets
+    Note over A,K: A heartbeats every 500 ms against the 2 s session window
+
+    B->>K: JoinGroup(g, t)
+    Note over K: membership event — generation 2, immediate range reassignment
+    K-->>B: JoinGroupResp — memberID m2, generation 2, its range
+
+    A->>K: Heartbeat(g, m1)
+    K-->>A: HeartbeatResp — flags bit0 REJOIN set (a LEVEL, m1's joined generation trails the group's)
+
+    A->>K: JoinGroup(g, t) — re-join on the SAME control conn
+    K-->>A: JoinGroupResp — same memberID m1, ADOPTS generation 2, no bump, no rebalance
+
+    A->>K: CommitOffsets(g, m1, generation 1) — a late commit still naming the old generation
+    K-->>A: Error 12 STALE_GENERATION — fenced at serve time, NO ack, nothing installed
+    A->>K: CommitOffsets(g, m1, generation 2) — reissued at the adopted generation
+    K-->>A: CommitOffsetsResp — commit file atomically written BEFORE this ack
+```
+
+</details>
+
 ## 10. Limits
 
 Every cap, its owning Go constant, and the code a violation earns. This
