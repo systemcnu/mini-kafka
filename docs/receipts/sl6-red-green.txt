@@ -1,0 +1,8 @@
+== SL6 red/green receipt (§Red) ==
+== RED 1 (end of row 1): docs/PROTOCOL.md does not exist — named hard fail, never a skip ==
+$ go test ./internal/wire -run TestProtocolDoc -count=1
+--- FAIL: TestProtocolDoc (0.00s)
+    protocoldoc_test.go:42: reading ../../docs/PROTOCOL.md: open ../../docs/PROTOCOL.md: no such file or directory
+FAIL
+FAIL	github.com/systemcnu/mini-kafka/internal/wire	0.290s
+FAIL
