@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
+      - run: echo "runner image= $ImageOS $ImageVersion"
       - run: go vet ./...
       # staticcheck pinned to a release compatible with the pinned toolchain.
       - run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
@@ -35,7 +36,22 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
+      - run: echo "runner image= $ImageOS $ImageVersion"
       - run: bash scripts/stdlib_audit.sh
+
+  # PROT-1's registry diff as a visibly named check (DD-26's "PROTOCOL.md
+  # registry diff" job): docs/PROTOCOL.md's tables ≡ internal/wire, both
+  # directions. The test also rides the test job's go test ./... — the
+  # named job is the readable signal, not the only run.
+  protocol-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - run: echo "runner image= $ImageOS $ImageVersion"
+      - run: go test ./internal/wire -run TestProtocolDoc -count=1
 
   # DD-21's external clock (D-SL3-5): fresh checkout in a container pinned
   # BY DIGEST — the digest is a fact of this committed workflow and the
@@ -66,7 +82,11 @@ jobs:
           path: demo-timing-receipt.txt
 
   build-smoke:
-    runs-on: macos-latest
+    # OPS-1: native build + smoke on BOTH platforms (ledger row 6).
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
