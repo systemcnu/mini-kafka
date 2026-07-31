@@ -42,7 +42,7 @@ Exit process (STATUS, BRIEF, code-map regen, commits, push, scenario-K receipt, 
 | 4 | Diagrams (D-SL6-9): ONE mermaid group-lifecycle sequenceDiagram (join → assignment → heartbeat/REJOIN → re-join adopts generation → fenced late commit) added to §P9; render-check then bake. Bake AFTER prose is final (rows 2–3 done) | `npx @mermaid-js/mermaid-cli -i /tmp/gl.mmd -o /tmp/gl.svg` renders · `python3 ~/.claude/templates/bake_mermaid.py docs/PROTOCOL.md` · `grep -rn '^\`\`\`mermaid' docs/PROTOCOL.md README.md` → 0 · `find docs/diagrams -name '*.png' -size +0c` non-empty · focused test STILL green after bake |
 | 5 | README pass (D-SL6-6 a–f, spec in §R): fsync prose swap (verbatim), R2 sentence, `--addr` port warning on the loopback sentence, PROTOCOL.md link; top screen and lines 80–123 untouched | §R grep battery (all four greps) · `go test ./cmd/bench -count=1` green — `TestReadmeBenchSectionMatchesCommittedReport` (render_test.go:131) proves the marker section byte-identical |
 | 6 | ci.yml (D-SL6-4 + ledger row 6, spec in §C): sixth job `protocol-doc`, echo line into vet-staticcheck AND stdlib-audit, build-smoke → `strategy.matrix.os [ubuntu-latest, macos-latest]` | `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` clean · job-count grep → 6 · `grep -c 'runner image='` → 5 · local equivalent of the new job: the focused test command, green |
-| 7 | Audits (D-SL6-8, exact commands in §A) → `docs/receipts/sl6-audits.txt`; push-dependent lines (OPS-1 matrix green, `gh run list` at the new HEAD) marked for integrator refresh at exit | `cat docs/receipts/sl6-audits.txt` shows every §A command + output; NFR-3 line ends `ALL-DOCUMENTED` |
+| 7 | Audits (D-SL6-8, exact commands in §A) → `docs/receipts/sl6-audits.txt`; push-dependent lines (OPS-1 matrix green, `gh run list` at the new HEAD) marked for integrator refresh at exit | `cat docs/receipts/sl6-audits.txt` shows every §A command + output; NFR-3 shows zero MISSING (integrator-corrected form) |
 | 8 | Full suite + local sabotage: all SIX sabotage rows run locally (mutate → focused test RED → restore → GREEN), redaction check | `go test ./... -race -count=1` green, count reported by the command · `bash scripts/checks.sh` → ALL CHECKS GREEN · six red/green pairs observed (§S) · redaction grep per §S |
 
 1 strictly first (red-before-green is structural: the test exists before any table it diffs). 2–5 in order (each consumes the prior; the bake in 4 must follow final prose; the README link in 5 needs the doc to exist). 6–8 in order after the doc is stable.
@@ -110,8 +110,10 @@ grep -n 'go 1.24' go.mod; grep -n '1.24.x\|@2025.1.1\|@v[0-9]\|sha256:' .github/
 test -f LICENSE && echo LICENSE-OK
 # NFR-1 (local equivalent of the stdlib-audit job)
 bash scripts/stdlib_audit.sh
-# NFR-3 — the FIXED loud-failure form (seat A killed the vacuous sed); vet+staticcheck via checks.sh
-go list ./... | while read -r p; do go doc "$p" | grep -q '^Package ' || { echo "MISSING doc header: $p"; exit 1; }; done && echo ALL-DOCUMENTED
+# NFR-3 — integrator-corrected form (seat A's grep '^Package ' was convention-wrong for
+# Command-doc'd cmd/* packages; .Doc is wording-agnostic); vet+staticcheck via checks.sh
+go list -f '{{if .GoFiles}}{{.ImportPath}} {{if .Doc}}DOC-OK{{else}}MISSING{{end}}{{end}}' ./...   # zero MISSING
+go list -f '{{if not .GoFiles}}{{.ImportPath}} TEST-ONLY-exempt{{end}}' ./...                      # states the e2e exemption
 ```
 
 OPS-1 (matrix green on both platforms) is push-evidence — integrator captures it at exit into the same receipt.

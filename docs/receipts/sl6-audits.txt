@@ -76,3 +76,22 @@ MISSING doc header: github.com/systemcnu/mini-kafka/cmd/bench
 
 -- OPS-1: matrix build+smoke green on BOTH platforms --
 [INTEGRATOR CAPTURE AT EXIT: push-evidence — six jobs / seven check runs (build-smoke x2) at the new HEAD]
+
+== INTEGRATOR RESOLUTION of the row-7 STOP (NFR-3), 2026-07-31 ==
+Builder's STOP was correct: the pinned command greps '^Package ' but Go command packages
+document as 'Command <name> ...' — the CHECK was wrong, all packages are documented.
+Corrected form (audits go list's .Doc, wording-agnostic; zero .go edits needed):
+$ go list -f '{{if .GoFiles}}{{.ImportPath}} {{if .Doc}}DOC-OK{{else}}MISSING{{end}}{{end}}' ./...
+github.com/systemcnu/mini-kafka/client DOC-OK
+github.com/systemcnu/mini-kafka/cmd/bench DOC-OK
+github.com/systemcnu/mini-kafka/cmd/demo DOC-OK
+github.com/systemcnu/mini-kafka/cmd/minikafka DOC-OK
+github.com/systemcnu/mini-kafka/cmd/mk DOC-OK
+github.com/systemcnu/mini-kafka/internal/broker DOC-OK
+github.com/systemcnu/mini-kafka/internal/group DOC-OK
+github.com/systemcnu/mini-kafka/internal/storage DOC-OK
+github.com/systemcnu/mini-kafka/internal/storage/storagetest DOC-OK
+github.com/systemcnu/mini-kafka/internal/wire DOC-OK
+$ go list -f '{{if not .GoFiles}}{{.ImportPath}} TEST-ONLY-exempt{{end}}' ./...
+github.com/systemcnu/mini-kafka/internal/e2e TEST-ONLY-exempt
+RESULT: zero MISSING across all 10 real packages; internal/e2e test-only, exempt. NFR-3 discharged.
