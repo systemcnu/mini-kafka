@@ -20,3 +20,7 @@
 ## What this means for the plan
 
 SL7 proceeds as planned when its turn comes: step 1 is account creation under Sri's control (no card = continue; card demanded = stop, document "later"). Nothing about SL0–SL6 changes either way.
+
+## Slice-exit record
+
+- **Re-verified 2026-07-31 (SL7 D-SL7-9 step 0, pre-build): no delta.** render.com/docs/free re-read; all five receipt facts unchanged (750 free instance hours/workspace/month with suspension on exhaustion · spin-down after 15 min without inbound traffic, wake on HTTP request/WebSocket taking about one minute behind Render's own loading page · ephemeral filesystem, changes lost on redeploy/restart/spin-down · Render may restart a Free web service at any time). No card requirement documented for free web services; the page mentions a payment method only as an option for overages ("If you haven't added a payment method, Render instead suspends all of your Free services"). Kill criterion stays armed at the account-creation moment; Phase A build proceeds.
