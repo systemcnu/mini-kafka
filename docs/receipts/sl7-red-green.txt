@@ -92,3 +92,23 @@ FAIL
 FAIL
 FAIL	github.com/systemcnu/mini-kafka/cmd/showcase	0.202s
 FAIL
+
+== GREEN (end of PLAN row 7): whole cmd/showcase package under -race ==
+--- PASS: TestPlateau (4.00s)
+--- PASS: TestFreshBoot (0.34s)
+--- PASS: TestWriteFailedPause (0.35s)
+--- PASS: TestCapEnv (0.00s)
+--- PASS: TestConcurrentLoad (1.38s)
+--- PASS: TestFeedShape (0.00s)
+--- PASS: TestBrokerConfig (0.00s)
+--- PASS: TestFeederLive (0.24s)
+--- PASS: TestFeederCleanStop (0.20s)
+--- PASS: TestPageServed (0.00s)
+--- PASS: TestPageStates (0.00s)
+--- PASS: TestPageConstant (0.00s)
+--- PASS: TestPageNoExternalAssets (0.00s)
+--- PASS: TestRoutes (0.00s)
+--- PASS: TestBind (0.00s)
+--- PASS: TestTimeouts (0.00s)
+PASS
+ok  	github.com/systemcnu/mini-kafka/cmd/showcase	7.744s
