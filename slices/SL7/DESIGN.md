@@ -106,4 +106,4 @@ and SLICES §2/SL7 (verbatim): "**Goal:** the watch-only live page — or its ho
 ---
 Sizing against the 2.5d remaining (0.5d of SL7's 3d spent at SL0 on the feasibility check): Phase A — cmd/showcase + tests 1.0d · shim + render.yaml + scan script + README variants 0.5d · checkpoint + deploy + scenario I live run + receipts 0.5d · exit process 0.5d (SD-6). Kill-path ending spends ~2.0d total (Phase B-live unspent beyond the checkpoint itself) and ends early — recorded honestly at the gate, not backfilled.
 
-Counts by command: design rows `grep -c '^| D-SL7-' slices/SL7/DESIGN.md` → 14 · ledger rows `grep -cE '^\| [0-9]+ \| ' slices/SL7/DESIGN.md` → 13 · known gaps `grep -c '^- \*\*G-SL7-' slices/SL7/DESIGN.md` → 7.
+Counts by command: design rows `grep -c '^| D-SL7-' slices/SL7/DESIGN.md` → 14 · ledger rows `grep -cE '^\| [0-9]+ \| ' slices/SL7/DESIGN.md` → 14 · known gaps `grep -c '^- \*\*G-SL7-' slices/SL7/DESIGN.md` → 8. (Footer re-derived 2026-08-01: the integrator's review additions — ledger row 14, G-SL7-8 — left the drafter's footer stale; caught by the blind post-run review.)
