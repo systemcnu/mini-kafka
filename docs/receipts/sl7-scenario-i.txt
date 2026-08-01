@@ -1,0 +1,28 @@
+SL7 scenario I — the live page watched through the Pages shim, 2026-08-01 (all times UTC)
+========================================================================================
+
+Precondition: the service was untouched for 25 minutes (timer receipted in the session;
+spin-down threshold 15 min) — asleep at open, proven below by the feed's own startedAt.
+
+12:35:25  T0 — opened https://systemcnu.github.io/mini-kafka/showcase/ in a real browser
+          (Playwright-driven Chromium; the shim's JS ran for real).
+12:35:35  WAKING STATE observed on the Pages origin, narrating the free tier honestly:
+          'waking the showcase — free-tier instances sleep when idle; first wake takes
+          about a minute.' + 'elapsed: 3 s' counter. Console showed exactly the designed
+          keep-waiting signal (the cross-origin poll failing while the service wakes).
+12:35:44  the service PROCESS BOOTED — the feed's own startedAt (19 s after T0): the
+          instance was genuinely asleep and the shim's poll woke it. Restart-fresh
+          visible: offsets restarted at 0, new temp data dir (the ephemeral design).
+12:35:48  SWAP-IN — the shim redirected to https://mini-kafka-showcase.onrender.com/
+          (~13 s after the waking state appeared; measured reality vs the '~1 minute'
+          narration — faster, recorded as measured per G-SL7-6).
+          Live page verified: watch-only copy ('there is no way to write to it'),
+          badge live, per-partition nextOffsets ticking, ring of recent records from
+          msg-0, disk 0 B / 200.0 MiB, assignment [0 1 2 3], repo link + run-it-yourself.
+
+Flow proof — two /feed reads 30+ s apart (curl, raw JSON fields):
+12:36:19  produced=69  diskBytes=993  diskCapBytes=209715200 memBytes=1383344 status=live
+12:36:59  produced=150 diskBytes=1852 diskCapBytes=209715200 memBytes=2275072 status=live
+produced strictly increasing (81 msgs / 40 s ≈ the designed ~2 msg/s); diskBytes << cap;
+memBytes present (the RAM observable the review added). SHOW-1 live half witnessed; the
+deployed route posture (405/404) is in sl7-portscan.txt.
