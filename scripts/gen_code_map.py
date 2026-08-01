@@ -237,6 +237,14 @@ CARDS = [
                 ("internal/wire/protocoldoc_test.go", "internal/wire/protocoldoc_test.go", "file"),
                 (".github/workflows/ci.yml", ".github/workflows/ci.yml", "file"),
             ]),
+            ("SL7: showcase (feed contract · cap plateau · -race load)", [
+                ("cmd/showcase/feed_test.go", "cmd/showcase/feed_test.go", "file"),
+                ("cmd/showcase/feeder_test.go", "cmd/showcase/feeder_test.go", "file"),
+                ("cmd/showcase/cap_test.go", "cmd/showcase/cap_test.go", "file"),
+                ("cmd/showcase/server_test.go", "cmd/showcase/server_test.go", "file"),
+                ("cmd/showcase/page_test.go", "cmd/showcase/page_test.go", "file"),
+                ("cmd/showcase/concurrent_test.go", "cmd/showcase/concurrent_test.go", "file"),
+            ]),
             ("fault scripting seam", [
                 ("internal/storage/storagetest/fault.go", "FaultFS", "type"),
                 ("internal/storage/storagetest/fault.go", "FaultFile", "type"),
@@ -314,6 +322,45 @@ CARDS = [
             ("durable commits", [
                 ("internal/group/commits.go", "Commit", "method"),
                 ("internal/group/commits.go", "loadCommits", "method"),
+            ]),
+        ],
+    },
+    {
+        "id": "show", "nick": "the observation deck", "icon": "\U0001f52d", "tint": "cmd",
+        "file": "cmd/showcase — main.go · feeder.go · snapshot.go · server.go", "col": 5, "row": 3,
+        "purpose": "The watch-only live showcase, one process by design: the broker hosted in-process on a hard-coded loopback literal, a self-feeder producing and group-consuming through the public client, every mutation swapped in as a fresh immutable snapshot, and a two-route HTTP surface — the embedded page plus the read-only ten-field /feed. Render deploy config, the GitHub Pages waking shim, and the per-deploy port-scan exposure witness ride alongside.",
+        "groups": [
+            ("boot & env", [
+                ("cmd/showcase/main.go", "main", "func"),
+                ("cmd/showcase/main.go", "capBytesFromEnv", "func"),
+            ]),
+            ("the feeder", [
+                ("cmd/showcase/feeder.go", "feeder", "type"),
+                ("cmd/showcase/feeder.go", "brokerConfig", "func"),
+                ("cmd/showcase/feeder.go", "start", "method"),
+                ("cmd/showcase/feeder.go", "producerLoop", "method"),
+                ("cmd/showcase/feeder.go", "consumerLoop", "method"),
+                ("cmd/showcase/feeder.go", "walkerLoop", "method"),
+                ("cmd/showcase/feeder.go", "pause", "method"),
+                ("cmd/showcase/feeder.go", "stop", "method"),
+            ]),
+            ("atomic snapshot", [
+                ("cmd/showcase/snapshot.go", "snapshot", "type"),
+                ("cmd/showcase/snapshot.go", "snapshotHolder", "type"),
+                ("cmd/showcase/snapshot.go", "newSnapshotHolder", "func"),
+                ("cmd/showcase/feeder.go", "publishLocked", "method"),
+            ]),
+            ("two-route surface", [
+                ("cmd/showcase/server.go", "newMux", "func"),
+                ("cmd/showcase/server.go", "newServer", "func"),
+                ("cmd/showcase/server.go", "listenAddr", "func"),
+                ("cmd/showcase/server.go", "pageHTML", "var"),
+                ("cmd/showcase/page.html", "cmd/showcase/page.html", "file"),
+            ]),
+            ("deploy & exposure witness", [
+                ("render.yaml", "render.yaml", "file"),
+                ("scripts/showcase_portscan.sh", "scripts/showcase_portscan.sh", "file"),
+                ("docs/showcase/index.html", "docs/showcase/index.html", "file"),
             ]),
         ],
     },
