@@ -1,0 +1,36 @@
+SL7 port-scan receipt — first live scan + procedure proof, 2026-08-01
+==================================================================
+
+1. FIRST RUN caught a REAL environment gap: filtered ports at Render's edge silently drop
+   packets; macOS nc -w does not bound the connect, so each filtered port hung minutes (the
+   local self-test could never see this — locally-closed ports answer RST instantly).
+   Fix: -G 3 connect timeout added to the probe (script + header note); shellcheck clean;
+   all three self-test legs re-proven: exit 0 / exit 1 naming port 39471 with the diff / exit 0.
+2. THE SCAN THEN DID ITS JOB LIVE: deviation — port 8080 OPEN vs expected closed. Investigated:
+   http://<host>:8080/feed -> 403 static 'Blocked' page (Render's SHARED EDGE listener);
+   http://<host>/feed -> 301 to https (the real edge route). 8080 is the platform edge, not
+   this service — the container exposes only $PORT. Expected file corrected to the edge's
+   witnessed posture (443/80/8080 open); explanation in the script header.
+3. FINAL SCAN, run bare (exit checked directly, no pipe): exit 0. Full output:
+port 443: open
+port 80: open
+port 7621: closed
+port 7620: closed
+port 7622: closed
+port 7623: closed
+port 7624: closed
+port 7625: closed
+port 7626: closed
+port 7627: closed
+port 7628: closed
+port 7629: closed
+port 7630: closed
+port 8080: open
+port 9092: closed
+port 3000: closed
+port 5432: closed
+port 6379: closed
+
+4. Live route-posture probes (the deployed binary, not the local one):
+   curl -X POST https://mini-kafka-showcase.onrender.com/feed -> 405
+   curl https://mini-kafka-showcase.onrender.com/nope -> 404

@@ -11,7 +11,7 @@ port 7627: closed
 port 7628: closed
 port 7629: closed
 port 7630: closed
-port 8080: closed
+port 8080: open
 port 9092: closed
 port 3000: closed
 port 5432: closed

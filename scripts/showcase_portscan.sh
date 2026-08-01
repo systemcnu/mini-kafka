@@ -4,7 +4,12 @@
 # Usage:
 #   scripts/showcase_portscan.sh <hostname> [--ports "<space list>"] [--expected <file>]
 #
-# Probes each port with `nc -z -w 3` and prints one stable line per port,
+# Probes each port with `nc -z -G 3 -w 3` (-G bounds the CONNECT: a filtered port that
+# silently drops packets — Render's edge posture — would otherwise hang past -w),
+# NOTE (witnessed at the first live scan, 2026-08-01): Render's SHARED EDGE answers
+# TCP on 8080 with a static 403 "Blocked" page for the hostname — an edge listener,
+# not this service (port 80 gives the proper 301-to-HTTPS; the container exposes only
+# $PORT). The expected file records the edge's real posture: 443/80/8080 open.
 # in argument order: `port NNN: open` / `port NNN: closed`. The output is
 # compared against the expected file; ANY deviation prints the diff and
 # exits non-zero.
@@ -75,7 +80,7 @@ done
 out=""
 read -r -a port_list <<<"$ports"
 for port in "${port_list[@]}"; do
-	if nc -z -w 3 "$host" "$port" >/dev/null 2>&1; then
+	if nc -z -G 3 -w 3 "$host" "$port" >/dev/null 2>&1; then
 		line="port $port: open"
 	else
 		line="port $port: closed"
