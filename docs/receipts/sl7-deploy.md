@@ -19,3 +19,16 @@ the settings step. plan: free is asserted in the committed render.yaml the Bluep
 
 OPEN AT THE GATE (G-SL7-7): the explicit dated 'no card was demanded anywhere' attestation —
 Sri's reply carried the hostname only; the attestation is requested with the gate verdict.
+
+## Gate disposition (appended 2026-08-01)
+
+Verdict: **pass**, delivered 2026-08-01 — the entire message was the single word 'pass'.
+The brief (question 5 + the status line) framed the required reply as an either/or:
+attest 'no card was demanded anywhere' OR, mandatorily if true, correct that a card WAS
+shown (which would change SHOW-2's disposition). No correction was sent with the verdict.
+Recorded honestly per G-SL7-7: the no-card branch stands by that explicit framing — the
+verdict passed a brief whose correction path was mandatory-if-true — but the literal dated
+attestation sentence was never typed by Sri; this paragraph is the transcription of what
+actually happened, not a quote. SHOW-2 disposition: SATISFIED (free plan asserted in the
+committed config · deploy live on it · no card-shown correction at the gate · the teardown
+criterion is standing policy if the platform's terms ever change).
